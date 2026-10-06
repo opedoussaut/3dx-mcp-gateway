@@ -105,3 +105,19 @@ docs/decisions/      Architecture decision records
 ```
 
 The blueprint is an architecture target. This v0.2 implementation is the first executable read-only slice; see [implementation scope](docs/IMPLEMENTATION.md) for the exact boundary. Corporate attachments, tenant exports and credentials are excluded from this public repository.
+
+
+## CECB L01 Dataset Governance PoC
+
+The `poc-dataset-governance` branch contains a deliberately credential-free foundation for the Dataset Governance integration experiment. It discovers `lakegovernance` through 3DCompass and can run one fixed unauthenticated v4 root-catalog probe without following the IAM redirect.
+
+Run locally:
+
+```powershell
+git checkout poc-dataset-governance
+npm start
+```
+
+Open `http://127.0.0.1:3000`. First run **service discovery**, then **safe GET probe**. The expected result at this stage is an authentication boundary, not enterprise data.
+
+See `docs/POC-EVIDENCE.md` for the evidence ledger, hypotheses and limitations. This PoC does not accept browser cookies, passwords, tokens or Openness Agent credentials and implements no writes.
