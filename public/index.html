@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>3DX MCP Gateway PoC</title><link rel="stylesheet" href="/styles.css"></head>
+<body>
+<main>
+  <header><div><span class="eyebrow">CECB · L01 · PoC PATH</span><h1>3DX MCP Gateway</h1><p>A controlled, read-only bridge experiment for Dataset Governance.</p></div><span class="pill">FOUNDATION · NO CREDENTIALS</span></header>
+  <section class="hero">
+    <div><h2>Prove the boundary before the bridge.</h2><p>This slice discovers <code>lakegovernance</code> and performs one fixed unauthenticated GET without following the IAM redirect. It does not collect browser cookies, passwords, tokens or agent keys.</p></div>
+    <div class="flow"><span>Local PoC</span><b>→</b><span>3DCompass</span><b>→</b><span>lakegovernance</span><b>→</b><span>IAM boundary</span></div>
+  </section>
+  <section class="grid">
+    <article><h3>1 · Discover</h3><p>Resolve the tenant's registered <code>lakegovernance</code> service.</p><button data-action="discover">Run service discovery</button><pre id="discover">Not run</pre></article>
+    <article><h3>2 · Probe</h3><p>Issue the single allowlisted v4 root-catalog GET. Redirects are never followed.</p><button data-action="probe">Run safe GET probe</button><pre id="probe">Not run</pre></article>
+  </section>
+  <section><div class="section-title"><h3>Evidence & limitations</h3><button class="secondary" data-action="refresh">Refresh audit</button></div><pre id="status">Loading…</pre><pre id="audit">No events yet</pre></section>
+</main><script type="module" src="/app.js"></script>
+</body></html>
