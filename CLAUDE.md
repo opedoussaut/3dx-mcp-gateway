@@ -13,6 +13,14 @@ Olivier remains the project owner and sets priorities. Make routine engineering 
 
 Repository: <https://github.com/opedoussaut/3dx-mcp-gateway>
 
+## P0 — connection priority: ITEROP + Datasets Governance BEFORE AURA
+
+**Olivier explicitly reprioritized NOVA-003:** the first real natural-language integrations must target **ITEROP (Business Process)** and **Datasets Governance (NETVIBES catalog)**, **before** benchmark comparisons to AURA. Preserve the existing AURA screen and test coverage but defer additional AURA work until one useful authorized LIVE read has been demonstrated in each target app, or Olivier changes priorities.
+
+**Read and execute `docs/missions/NOVA-003-ITEROP-DATASET-GOVERNANCE-FIRST.md`.** Its initial domain operations are proposed *semantic* functions, not verified HTTP API contracts. Research approved documented operations independently for ITEROP and catalog services. Their authentication, entitlement and origins must not be conflated with engineering-item 3DSpace access. The ITEROP API Gateway route may require PFI (which Olivier says he lacks); no external Datasets Governance catalog API has been confirmed yet. Do not bypass access controls. Work on functional synthetic vertical slices and beautiful NOVA interface while obtaining documented and corporate-approved tenant access via an authorized channel.
+
+No unauthorized corporate uploads, external AI egress, process mutations, dataset downloads or secret disclosure. Work in the existing gateway repo. Build app-specific read-only adapters first, request human approval for any future process start/task completion.
+
 ## P0 user experience direction — future GEN7 engineering workspace
 
 **NOVA must look like the future of a premium 3D engineering workspace**, not like a generic chatbot, old enterprise dashboard, copied corporate site or unrelated SaaS product. This is a **high-priority, acceptance-gated instruction from Olivier**, equal in product importance to functional 3DEXPERIENCE integration.
