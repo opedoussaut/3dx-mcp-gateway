@@ -13,6 +13,14 @@ Olivier remains the project owner and sets priorities. Make routine engineering 
 
 Repository: <https://github.com/opedoussaut/3dx-mcp-gateway>
 
+## P0 user experience direction — future GEN7 engineering workspace
+
+**NOVA must look like the future of a premium 3D engineering workspace**, not like a generic chatbot, old enterprise dashboard, copied corporate site or unrelated SaaS product. This is a **high-priority, acceptance-gated instruction from Olivier**, equal in product importance to functional 3DEXPERIENCE integration.
+
+**Before major UI work read [the GEN7-inspired NOVA visual and interaction brief](docs/design/NOVA-GEN7-EXPERIENCE-VISION.md).** Its reference composition combines an engineering object/structure/canvas, precision-blue industrial grammar, and an exceptionally polished Apple-like information and interaction design (open-source assets; no copied corporate/Apple IP). The user-facing product must say **NOVA**, not "3DEXPERIENCE" or "Dassault Systèmes", and must not use their names/logos/branding in the shell or marketing. Accurate technical vendor names may remain in engineering documentation and restricted operator diagnostics.
+
+Implement—not merely describe—the design direction on feature branches, show actual desktop/mobile screenshots, and preserve verified evidence, read-only/source separation, accessibility, backend contracts and existing tests. References provided to ChatGPT are not automatically available to Claude Code; the brief captures their important visual principles.
+
 ## Product objective
 
 Build a polished natural-language engineering workspace that Olivier can use with his corporate 3DEXPERIENCE platform and evaluate fairly against AURA. The long-term goal is a working private integration with traceable engineering outcomes. The current executable baseline is a local application with synthetic missions and a contract-gated read adapter.
