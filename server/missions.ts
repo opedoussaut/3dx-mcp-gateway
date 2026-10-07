@@ -1,5 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type {
+  AppDomain,
+  Domain,
   Evidence,
   Intent,
   Item,
@@ -11,18 +13,35 @@ import type {
 } from '../shared/types';
 import { Gateway, GatewayError, evidence } from './gateway';
 import { deterministicRoute, OllamaProvider, type ModelProvider } from './provider';
+import { AppConnector } from './apps/connector';
+import { loadAppConfig } from './apps/config';
+import { runAppMission } from './apps/missions';
 
 export class MissionRunner {
+  private apps: Record<AppDomain, AppConnector>;
   constructor(
     private gateway: Gateway,
     private provider?: ModelProvider,
-  ) {}
-  async run(prompt: string, source: Source, mode: Mode): Promise<Mission> {
+    apps?: Partial<Record<AppDomain, AppConnector>>,
+  ) {
+    this.apps = {
+      ITEROP: apps?.ITEROP || new AppConnector(loadAppConfig('ITEROP', {})),
+      DATASET_CATALOG:
+        apps?.DATASET_CATALOG || new AppConnector(loadAppConfig('DATASET_CATALOG', {})),
+    };
+  }
+  async run(
+    prompt: string,
+    source: Source,
+    mode: Mode,
+    domain: Domain = 'ENGINEERING',
+  ): Promise<Mission> {
     const start = performance.now();
     const mission: Mission = {
       id: randomUUID(),
       prompt,
       source,
+      domain,
       mode,
       intent: 'unknown',
       status: 'completed',
@@ -65,6 +84,23 @@ export class MissionRunner {
         : 'Only admitted public read operations. No platform mutations.',
       'policy',
     );
+    if (domain !== 'ENGINEERING') {
+      trace(
+        'Application scope',
+        `${domain} selected by the operator. Its origin, credential and contract are independent.`,
+        'policy',
+      );
+      return runAppMission({
+        mission,
+        connector: this.apps[domain],
+        source,
+        mode,
+        prompt,
+        trace,
+        stop,
+        finish,
+      });
+    }
     const actionable = prompt
       .toLowerCase()
       .replace(

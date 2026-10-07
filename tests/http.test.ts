@@ -29,6 +29,33 @@ test('HTTP workflow isolates sessions, validates origins and preserves unknown A
   try {
     const status = await (await request('/status')).json();
     assert.equal(status.liveReady, false);
+    assert.equal(status.apps.ITEROP.liveReady, false);
+    assert.equal(status.apps.DATASET_CATALOG.liveReady, false);
+    const process = await (
+      await request('/missions', {
+        prompt: 'Show the tasks assigned to me',
+        source: 'synthetic',
+        mode: 'ASK',
+        domain: 'ITEROP',
+      })
+    ).json();
+    assert.equal(process.domain, 'ITEROP');
+    assert.equal(process.status, 'completed');
+    assert.equal(
+      (
+        await request('/missions', {
+          prompt: 'Show my tasks',
+          source: 'synthetic',
+          mode: 'ASK',
+          domain: 'OTHER',
+        })
+      ).status,
+      400,
+    );
+    assert.equal((await request('/apps/ITEROP/test', {})).status, 409);
+    assert.equal((await request('/apps/DATASET_CATALOG/test', {})).status, 409);
+    assert.equal((await request('/apps/UNKNOWN/test', {})).status, 404);
+    await request('/session/clear', {});
     const b = benchmarks[0];
     const mission = await (
       await request('/missions', { prompt: b.prompt, source: 'synthetic', mode: b.mode })

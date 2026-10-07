@@ -4,6 +4,9 @@ import { z } from 'zod';
 import { loadConfig, runtimeStatus, type Config } from './config';
 import { Gateway, GatewayError } from './gateway';
 import { MissionRunner } from './missions';
+import { AppConnector } from './apps/connector';
+import { appStatus, loadAppConfig } from './apps/config';
+import type { AppDomain } from '../shared/types';
 import type { Comparison, Mission } from '../shared/types';
 import { benchmarks } from '../shared/benchmarks';
 import corpus from '../docs/blueprint/benchmarks/fixtures/synthetic-engineering-corpus.json';
@@ -14,6 +17,7 @@ const missionInput = z
     prompt: z.string().trim().min(3).max(2000),
     source: z.enum(['synthetic', 'live']),
     mode: z.enum(['ASK', 'INVESTIGATE', 'ACT']),
+    domain: z.enum(['ENGINEERING', 'ITEROP', 'DATASET_CATALOG']).default('ENGINEERING'),
   })
   .strict();
 const score = z.number().int().min(0).max(2).nullable();
@@ -42,10 +46,24 @@ type Session = {
   busy: boolean;
   seen: number;
 };
-export function createApp(config: Config = loadConfig(), gateway = new Gateway(config)) {
+export function createApp(
+  config: Config = loadConfig(),
+  gateway = new Gateway(config),
+  apps: Record<AppDomain, AppConnector> = {
+    ITEROP: new AppConnector(loadAppConfig('ITEROP')),
+    DATASET_CATALOG: new AppConnector(loadAppConfig('DATASET_CATALOG')),
+  },
+) {
   const app = express();
   const sessions = new Map<string, Session>();
-  const runner = new MissionRunner(gateway);
+  const runner = new MissionRunner(gateway, undefined, apps);
+  const status = () => ({
+    ...runtimeStatus(config),
+    apps: {
+      ITEROP: appStatus(apps.ITEROP.config),
+      DATASET_CATALOG: appStatus(apps.DATASET_CATALOG.config),
+    },
+  });
   app.disable('x-powered-by');
   app.use((req, res, next) => {
     if (!['localhost', '127.0.0.1', '[::1]'].includes(req.hostname))
@@ -103,7 +121,7 @@ export function createApp(config: Config = loadConfig(), gateway = new Gateway(c
     next();
   });
   app.use(express.json({ limit: '64kb' }));
-  app.get('/api/status', (_req, res) => res.json(runtimeStatus(config)));
+  app.get('/api/status', (_req, res) => res.json(status()));
   app.get('/api/benchmarks', (_req, res) => res.json(benchmarks));
   app.get('/api/registry', (_req, res) =>
     res.json(
@@ -141,7 +159,12 @@ export function createApp(config: Config = loadConfig(), gateway = new Gateway(c
       return res.status(409).json({ error: 'A mission is already running in this session.' });
     session.busy = true;
     try {
-      const result = await runner.run(parsed.data.prompt, parsed.data.source, parsed.data.mode);
+      const result = await runner.run(
+        parsed.data.prompt,
+        parsed.data.source,
+        parsed.data.mode,
+        parsed.data.domain,
+      );
       session.missions.unshift(result);
       session.missions = session.missions.slice(0, 50);
       res.json(result);
@@ -152,12 +175,10 @@ export function createApp(config: Config = loadConfig(), gateway = new Gateway(c
   app.post('/api/connection/test', async (_req, res) => {
     const status = runtimeStatus(config);
     if (!status.liveReady || !status.allowedTools.includes('get_current_user'))
-      return res
-        .status(409)
-        .json({
-          error:
-            'A complete private configuration and a verified get_current_user binding are required. No request was made.',
-        });
+      return res.status(409).json({
+        error:
+          'A complete private configuration and a verified get_current_user binding are required. No request was made.',
+      });
     try {
       const result = await gateway.call('get_current_user', {}, 'live');
       if (!result.evidence.length)
@@ -174,23 +195,49 @@ export function createApp(config: Config = loadConfig(), gateway = new Gateway(c
         .json({ error: e instanceof GatewayError ? e.message : 'Connection test failed.' });
     }
   });
+  app.post('/api/apps/:app/test', async (req, res) => {
+    const name = req.params.app;
+    if (name !== 'ITEROP' && name !== 'DATASET_CATALOG')
+      return res.status(404).json({ error: 'Unknown application.' });
+    const connector = apps[name];
+    const contract = connector.config.contract;
+    if (connector.config.blockers.length || !contract)
+      return res.status(409).json({
+        error:
+          'This application needs its private origin, credential and reviewed contract. No request was made.',
+      });
+    try {
+      const result = await connector.call(
+        contract.probe.operation,
+        contract.probe.query ? { query: contract.probe.query } : {},
+        'live',
+      );
+      res.json({
+        ok: true,
+        checkedAt: new Date().toISOString(),
+        records: result.records.length,
+        coverage: result.coverage,
+        message: `The reviewed ${contract.probe.operation} read succeeded. Other operations must still be verified individually.`,
+      });
+    } catch (e) {
+      res
+        .status(502)
+        .json({ error: e instanceof GatewayError ? e.message : 'Connection test failed.' });
+    }
+  });
   app.get('/api/benchmark-context', (_req, res) => {
     const { negative_cases: _excluded, ...context } = corpus;
-    res
-      .set('Content-Disposition', 'attachment; filename="nova-synthetic-context.json"')
-      .json({
-        ...context,
-        note: 'Synthetic source facts and review policy. Provide identical accessible context to each system; no expected answers or scoring assertions included.',
-      });
+    res.set('Content-Disposition', 'attachment; filename="nova-synthetic-context.json"').json({
+      ...context,
+      note: 'Synthetic source facts and review policy. Provide identical accessible context to each system; no expected answers or scoring assertions included.',
+    });
   });
   app.post('/api/comparisons', (req, res) => {
     const parsed = observationInput.safeParse(req.body);
     if (!parsed.success)
-      return res
-        .status(400)
-        .json({
-          error: 'Add the AURA answer, release and competency; use valid optional measurements.',
-        });
+      return res.status(400).json({
+        error: 'Add the AURA answer, release and competency; use valid optional measurements.',
+      });
     const session = res.locals.session as Session;
     const nova = session.missions.find((m) => m.id === parsed.data.missionId);
     const benchmark = benchmarks.find((b) => b.id === parsed.data.benchmarkId)!;

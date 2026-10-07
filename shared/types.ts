@@ -1,7 +1,29 @@
 export type Source = 'synthetic' | 'live';
+/** Application domain chosen explicitly by the operator. Prompt text can never switch it. */
+export type Domain = 'ENGINEERING' | 'ITEROP' | 'DATASET_CATALOG';
+export type AppDomain = Exclude<Domain, 'ENGINEERING'>;
 export type Mode = 'ASK' | 'INVESTIGATE' | 'ACT';
 export type Intent =
-  'revision' | 'structure' | 'compare' | 'qualification' | 'prepare' | 'search' | 'unknown';
+  | 'revision'
+  | 'structure'
+  | 'compare'
+  | 'qualification'
+  | 'prepare'
+  | 'search'
+  | 'unknown'
+  | AppIntent;
+export type AppIntent =
+  | 'process.startable'
+  | 'process.my_tasks'
+  | 'process.status'
+  | 'process.remaining_steps'
+  | 'process.task_attention'
+  | 'process.prepare'
+  | 'catalog.search'
+  | 'catalog.owner'
+  | 'catalog.related'
+  | 'catalog.lineage'
+  | 'catalog.suitability';
 export type ToolName =
   | 'get_current_user'
   | 'search_engineering_items'
@@ -19,6 +41,8 @@ export type Evidence = {
   id: string;
   title: string;
   source: Source;
+  /** Normalized record kind used for canvas rendering, e.g. `process.task`. */
+  kind?: string;
   fields: Record<string, string | number | boolean | null>;
   retrievedAt: string;
 };
@@ -41,6 +65,7 @@ export type Mission = {
   id: string;
   prompt: string;
   source: Source;
+  domain: Domain;
   mode: Mode;
   intent: Intent;
   status: 'completed' | 'needs_input' | 'blocked' | 'insufficient_evidence' | 'prepared';
@@ -65,6 +90,7 @@ export type Mission = {
     summary: string;
     evidenceRefs: string[];
     status: 'DRAFT_ONLY';
+    kind?: 'engineering.review' | 'process.start' | 'process.complete_task';
     expiresAt: string;
     digest: string;
   };
@@ -81,6 +107,21 @@ export type RuntimeStatus = {
   allowedTools: ToolName[];
   provider: string;
   modelReady: boolean;
+  apps: Record<AppDomain, AppStatus>;
+};
+export type AppStatus = {
+  app: AppDomain;
+  label: string;
+  liveReady: boolean;
+  configured: boolean;
+  credentialsPresent: boolean;
+  contractValid: boolean;
+  release: string | null;
+  authMode: string | null;
+  blockers: string[];
+  allowedOperations: string[];
+  candidateOperations: { name: string; description: string; status: 'UNVERIFIED' | 'ADMITTED' }[];
+  accessFinding: string;
 };
 export type Benchmark = {
   id: string;

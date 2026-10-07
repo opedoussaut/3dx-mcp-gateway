@@ -2,15 +2,9 @@ import { z } from 'zod';
 import corpus from '../docs/blueprint/benchmarks/fixtures/synthetic-engineering-corpus.json';
 import type { Evidence, Item, Source, ToolName, ToolResult } from '../shared/types';
 import type { Config } from './config';
+import { GatewayError, atPath, boundedGetJson } from './http';
 
-export class GatewayError extends Error {
-  constructor(
-    public code: string,
-    message: string,
-  ) {
-    super(message);
-  }
-}
+export { GatewayError, atPath };
 const itemSchema = z.object({
   id: z.string().min(1).max(300),
   identifier: z.string().min(1).max(300),
@@ -48,17 +42,6 @@ const fieldNames = new Set([
   'linkedFields',
   'displayName',
 ]);
-export function atPath(value: unknown, path: string): unknown {
-  return path
-    .split('.')
-    .reduce<unknown>(
-      (v, p) =>
-        v !== null && typeof v === 'object' && Object.hasOwn(v, p)
-          ? (v as Record<string, unknown>)[p]
-          : undefined,
-      value,
-    );
-}
 export function evidence(
   id: string,
   title: string,
@@ -193,56 +176,10 @@ export class Gateway {
       );
     if (binding.queryParameter && args.query)
       url.searchParams.set(binding.queryParameter, args.query.slice(0, 300));
-    let response: Response;
-    try {
-      response = await this.request(url, {
-        method: 'GET',
-        redirect: 'error',
-        signal: AbortSignal.timeout(12_000),
-        headers: {
-          Accept: 'application/json',
-          Authorization: this.config.authorization!,
-          SecurityContext: this.config.securityContext!,
-        },
-      });
-    } catch {
-      throw new GatewayError(
-        'UPSTREAM_UNAVAILABLE',
-        'The platform could not be reached. Check the private runtime; no retry or redirect was attempted.',
-      );
-    }
-    if (response.status === 401 || response.status === 403)
-      throw new GatewayError(
-        'AUTHORIZATION_DENIED',
-        'The platform denied access. No identity or endpoint fallback was attempted.',
-      );
-    if (!response.ok)
-      throw new GatewayError('UPSTREAM_ERROR', `The platform returned HTTP ${response.status}.`);
-    if (!response.headers.get('content-type')?.includes('json'))
-      throw new GatewayError('INVALID_RESPONSE', 'Expected the documented JSON response.');
-    let raw: unknown;
-    try {
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error();
-      const chunks: Uint8Array[] = [];
-      let length = 0;
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        length += value.length;
-        if (length > 1_000_000) {
-          await reader.cancel();
-          throw new Error();
-        }
-        chunks.push(value);
-      }
-      raw = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-    } catch {
-      throw new GatewayError(
-        'INVALID_RESPONSE',
-        'The platform response was invalid or exceeded the one-megabyte limit.',
-      );
-    }
+    const raw = await boundedGetJson(this.request, url, {
+      Authorization: this.config.authorization!,
+      SecurityContext: this.config.securityContext!,
+    });
     const rows = binding.rowsPath ? atPath(raw, binding.rowsPath) : raw;
     const allRows = Array.isArray(rows) ? rows : rows && typeof rows === 'object' ? [rows] : [];
     if (!rows || typeof rows !== 'object')

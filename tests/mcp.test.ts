@@ -21,7 +21,9 @@ test('MCP stdio exposes bounded read tools and returns labelled synthetic eviden
   try {
     await client.connect(transport);
     const tools = await client.listTools();
-    assert.equal(tools.tools.length, 8);
+    assert.equal(tools.tools.length, 17);
+    assert.ok(tools.tools.some((t) => t.name === 'iterop_list_my_tasks'));
+    assert.ok(tools.tools.some((t) => t.name === 'catalog_get_dataset'));
     assert.ok(tools.tools.every((t) => t.annotations?.readOnlyHint === true));
     assert.ok(!tools.tools.some((t) => /submit|delete|commit|execute|request/i.test(t.name)));
     const result = await client.callTool({
@@ -32,6 +34,15 @@ test('MCP stdio exposes bounded read tools and returns labelled synthetic eviden
     const data = JSON.parse(first.text);
     assert.equal(data.source, 'synthetic');
     assert.equal(data.items.length, 2);
+    const tasks = await client.callTool({ name: 'iterop_list_my_tasks', arguments: {} });
+    const taskData = JSON.parse((tasks.content as { type: string; text: string }[])[0].text);
+    assert.equal(taskData.source, 'synthetic');
+    assert.equal(taskData.records.length, 3);
+    const denied = await client.callTool({
+      name: 'catalog_get_dataset',
+      arguments: { id: 'DS-SYN-SUPPLIER-PRICES' },
+    });
+    assert.equal(denied.isError, true);
     const invalid = await client.callTool({
       name: 'search_engineering_items',
       arguments: { query: '' },

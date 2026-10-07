@@ -1,0 +1,41 @@
+{
+  "notice": "SYNTHETIC FIXTURE. Invented process data for NOVA testing. Not derived from any tenant, customer or real ITEROP deployment.",
+  "principal": { "id": "syn-operator", "displayName": "Demo operator" },
+  "definitions": [
+    { "id": "PD-SYN-ECR", "name": "Engineering change request", "category": "Engineering", "version": "3", "description": "Request, assess and approve an engineering change.", "startable": true },
+    { "id": "PD-SYN-CONTRACTOR", "name": "Contractor access form", "category": "Operations", "version": "2", "description": "Request site and system access for an external contractor.", "startable": true },
+    { "id": "PD-SYN-TOOLING", "name": "Tooling purchase request", "category": "Procurement", "version": "5", "description": "Request budget approval for production tooling.", "startable": true },
+    { "id": "PD-SYN-SUPPLIER", "name": "Supplier onboarding", "category": "Procurement", "version": "4", "description": "Qualify and register a new supplier.", "startable": false }
+  ],
+  "instances": [
+    { "id": "PI-SYN-1042", "name": "ECR — fan bracket stiffness", "definition": "PD-SYN-ECR", "status": "RUNNING", "startedOffsetDays": -9, "updatedOffsetDays": -1, "initiator": "Design Engineering", "currentStep": "Quality approval", "visible": true },
+    { "id": "PI-SYN-1057", "name": "Contractor access — test lab", "definition": "PD-SYN-CONTRACTOR", "status": "RUNNING", "startedOffsetDays": -3, "updatedOffsetDays": 0, "initiator": "Lab Operations", "currentStep": "Security review", "visible": true },
+    { "id": "PI-SYN-0998", "name": "Tooling — injection mould 48V housing", "definition": "PD-SYN-TOOLING", "status": "COMPLETED", "startedOffsetDays": -40, "updatedOffsetDays": -12, "initiator": "Manufacturing Engineering", "currentStep": "Closed", "visible": true },
+    { "id": "PI-SYN-9001", "name": "Restricted executive process", "definition": "PD-SYN-SUPPLIER", "status": "RUNNING", "startedOffsetDays": -5, "updatedOffsetDays": -2, "initiator": "Restricted", "currentStep": "Restricted", "visible": false }
+  ],
+  "steps": {
+    "PI-SYN-1042": [
+      { "id": "ST-1042-1", "name": "Change submitted", "order": 1, "status": "COMPLETED", "assignee": "Design Engineering", "completedOffsetDays": -9, "approval": false },
+      { "id": "ST-1042-2", "name": "Engineering impact assessment", "order": 2, "status": "COMPLETED", "assignee": "Mechanical Engineering", "completedOffsetDays": -4, "approval": false },
+      { "id": "ST-1042-3", "name": "Quality approval", "order": 3, "status": "ACTIVE", "assignee": "Demo operator", "dueOffsetDays": 1, "approval": true },
+      { "id": "ST-1042-4", "name": "Change board sign-off", "order": 4, "status": "PENDING", "assignee": "Change board", "dueOffsetDays": 6, "approval": true },
+      { "id": "ST-1042-5", "name": "Implementation notice", "order": 5, "status": "PENDING", "assignee": "Design Engineering", "approval": false }
+    ],
+    "PI-SYN-1057": [
+      { "id": "ST-1057-1", "name": "Request submitted", "order": 1, "status": "COMPLETED", "assignee": "Lab Operations", "completedOffsetDays": -3, "approval": false },
+      { "id": "ST-1057-2", "name": "Security review", "order": 2, "status": "ACTIVE", "assignee": "Demo operator", "dueOffsetDays": -1, "approval": true },
+      { "id": "ST-1057-3", "name": "Badge provisioning", "order": 3, "status": "PENDING", "assignee": "Facilities", "approval": false }
+    ],
+    "PI-SYN-0998": [
+      { "id": "ST-0998-1", "name": "Request submitted", "order": 1, "status": "COMPLETED", "assignee": "Manufacturing Engineering", "completedOffsetDays": -40, "approval": false },
+      { "id": "ST-0998-2", "name": "Budget approval", "order": 2, "status": "COMPLETED", "assignee": "Finance", "completedOffsetDays": -20, "approval": true },
+      { "id": "ST-0998-3", "name": "Purchase order", "order": 3, "status": "COMPLETED", "assignee": "Procurement", "completedOffsetDays": -12, "approval": false }
+    ]
+  },
+  "tasks": [
+    { "id": "TSK-SYN-301", "name": "Approve quality impact", "process": "PI-SYN-1042", "step": "Quality approval", "status": "OPEN", "priority": "HIGH", "dueOffsetDays": 1, "createdOffsetDays": -4, "assignedToPrincipal": true },
+    { "id": "TSK-SYN-302", "name": "Review contractor security form", "process": "PI-SYN-1057", "step": "Security review", "status": "OPEN", "priority": "MEDIUM", "dueOffsetDays": -1, "createdOffsetDays": -3, "assignedToPrincipal": true },
+    { "id": "TSK-SYN-305", "name": "Confirm test-lab calibration evidence", "process": "PI-SYN-1042", "step": "Quality approval", "status": "OPEN", "priority": "LOW", "createdOffsetDays": -2, "assignedToPrincipal": true },
+    { "id": "TSK-SYN-310", "name": "Board sign-off", "process": "PI-SYN-1042", "step": "Change board sign-off", "status": "OPEN", "priority": "HIGH", "dueOffsetDays": 6, "createdOffsetDays": -1, "assignedToPrincipal": false }
+  ]
+}

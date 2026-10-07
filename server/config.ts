@@ -161,7 +161,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   };
 }
 
-export function runtimeStatus(config: Config): RuntimeStatus {
+export function runtimeStatus(config: Config): Omit<RuntimeStatus, 'apps'> {
   return {
     version: '0.2.0',
     liveReady: config.blockers.length === 0,
