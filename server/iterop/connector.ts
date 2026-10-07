@@ -53,6 +53,7 @@ function synthetic(spec: OperationSpec, args: IteropArgs): Record<string, Scalar
             processKey: t.processKey,
             processName: fixture.processes.find((p) => p.processKey === t.processKey)?.name,
             processInstanceId: t.processInstanceId,
+            step: t.step,
             status: t.status,
             priority: t.priority,
             dueDate: dateAt(t.dueOffsetDays),

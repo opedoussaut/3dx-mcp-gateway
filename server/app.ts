@@ -10,6 +10,7 @@ import type { Comparison, Mission } from '../shared/types';
 import { benchmarks } from '../shared/benchmarks';
 import corpus from '../docs/blueprint/benchmarks/fixtures/synthetic-engineering-corpus.json';
 import registry from '../docs/blueprint/registry/api-registry.json';
+import iteropFixture from '../docs/blueprint/benchmarks/fixtures/synthetic-iterop.json';
 
 const missionInput = z
   .object({
@@ -116,6 +117,12 @@ export function createApp(
   app.use(express.json({ limit: '64kb' }));
   app.get('/api/status', (_req, res) => res.json(status()));
   app.get('/api/benchmarks', (_req, res) => res.json(benchmarks));
+  // SYNTHETIC illustration only: no P0 operation returns process steps. A live flow would need
+  // the reviewed P1 operation getProcessInfo, which is not admitted.
+  app.get('/api/iterop/flows', (_req, res) => {
+    const { notice, ...flows } = iteropFixture.flows;
+    res.json({ source: 'synthetic', illustration: true, notice, flows });
+  });
   app.get('/api/registry', (_req, res) =>
     res.json(
       registry.tools.map((t) => ({

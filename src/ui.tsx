@@ -121,12 +121,24 @@ export function Result({ mission, compact = false }: { mission: Mission; compact
       <p className="answer">{mission.answer}</p>
       {!!mission.findings.length && (
         <ul className="findings">
-          {mission.findings.map((finding, i) => (
-            <li key={i}>
-              <span className="finding-dot" />
-              <span>{finding}</span>
-            </li>
-          ))}
+          {mission.findings.map((finding, i) => {
+            // Citations like "[id]" stay inspectable without dominating the sentence.
+            const cite = finding.match(/^\[([^\]]{1,300})\]\s*/);
+            return (
+              <li key={i}>
+                <span className="finding-dot" />
+                <span>
+                  {cite ? finding.slice(cite[0].length) : finding}
+                  {cite && (
+                    <span className="cite" title={`Evidence: ${cite[1]}`}>
+                      <FileText size={11} aria-hidden="true" />
+                      <span className="sr-only">Evidence: {cite[1]}</span>
+                    </span>
+                  )}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
       {mission.draft && (

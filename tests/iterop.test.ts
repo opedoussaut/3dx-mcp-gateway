@@ -409,3 +409,12 @@ test('private configuration is namespaced and must match the contract', () => {
     rmSync(dir, { recursive: true });
   }
 });
+test('tasks resolve by name; quoted names are never read as write commands', async () => {
+  const byName = await run('Why does “Approve quality impact” need my attention?', 'INVESTIGATE');
+  assert.equal(byName.status, 'completed');
+  assert.equal(byName.title, 'Why “Approve quality impact” needs your attention');
+  assert.equal(byName.metrics.toolCalls, 1);
+  assert.equal((await run('Approve quality impact now')).status, 'blocked');
+  const unknown = await run('Why does “Order lunch” need my attention?');
+  assert.equal(unknown.status, 'needs_input');
+});

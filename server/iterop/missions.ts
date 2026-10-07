@@ -25,7 +25,8 @@ const taskRef = (prompt: string) =>
   prompt.match(/\btask\s*(?:id)?\s*[:=#]\s*([A-Za-z0-9_.:-]{1,200})\b/i)?.[1];
 
 export function routeIterop(prompt: string): IteropRoute {
-  const p = prompt.toLowerCase();
+  // Quoted text names an object; it is never read as a command ("Approve quality impact").
+  const p = prompt.toLowerCase().replace(/[“"][^”"]{1,200}[”"]/g, ' “name” ');
   if (/\b(prepare|draft|prépare\w*|brouillon)\b/.test(p)) return { intent: 'process.prepare' };
   if (
     /\b(startable|launchable)\b/.test(p) ||
@@ -52,6 +53,8 @@ export function routeIterop(prompt: string): IteropRoute {
   const taskId = taskRef(prompt);
   if (taskId && /\b(why|attention|urgent|explain|pourquoi|explique)\b/.test(p))
     return { intent: 'process.task_attention', taskId };
+  if (/\b(need|needs)\b.*\battention\b|\bpourquoi\b.*\b(tâche|attention)\b/.test(p))
+    return { intent: 'process.task_attention' };
   if (
     /\b(tasks?|tâches?|to-?do|inbox|work on|overdue|late|en retard|assigned|assignées?)\b/.test(p)
   )
@@ -237,16 +240,25 @@ export async function runIteropMission(ctx: Ctx): Promise<Mission> {
         });
         const overdue = sorted.filter((t) => (str(t, 'dueDate') || '9999') < now);
         if (route.intent === 'process.task_attention') {
-          const t = sorted.find((x) => x.id.toLowerCase() === route.taskId?.toLowerCase());
+          const byName = route.taskId ? undefined : matchProcess(prompt, sorted);
+          if (byName?.candidates.length)
+            return stop(
+              'needs_input',
+              'Which task do you mean?',
+              `Several of your tasks match: ${byName.candidates.map((c) => c.title).join(', ')}. Name one exactly.`,
+            );
+          const t = route.taskId
+            ? sorted.find((x) => x.id.toLowerCase() === route.taskId?.toLowerCase())
+            : byName?.match;
           if (!t)
             return stop(
               'needs_input',
               'That task is not in your current tasks',
-              `NOVA can only explain tasks returned for your own identity. ${sorted.length} current tasks were returned; ${route.taskId} is not among them.`,
+              `NOVA can only explain tasks returned for your own identity. ${sorted.length} current tasks were returned and none matches.`,
             );
           mission.evidence = [t];
           const due = str(t, 'dueDate');
-          mission.title = `Why ${t.id} needs your attention`;
+          mission.title = `Why “${t.title}” needs your attention`;
           mission.answer = `From its returned fields only: ${t.title}. NOVA reports declared values and does not infer a business cause.`;
           mission.findings = [
             `[${t.id}] Returned in your current task list.`,

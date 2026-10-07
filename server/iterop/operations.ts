@@ -69,6 +69,7 @@ export const operations: readonly OperationSpec[] = [
       'processKey',
       'processName',
       'processInstanceId',
+      'step',
       'status',
       'priority',
       'dueDate',

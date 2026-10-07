@@ -33,9 +33,12 @@ import { IteropWorkspace } from './IteropWorkspace';
 type View = 'process' | 'missions' | 'compare' | 'connections' | 'registry';
 const nav = [
   { id: 'process', label: 'Business Process', icon: Workflow },
-  { id: 'missions', label: 'Mission control', icon: MessageSquare },
-  { id: 'compare', label: 'AURA comparison', icon: GitCompareArrows },
   { id: 'connections', label: 'Connections', icon: Unplug },
+  { id: 'missions', label: 'Mission control', icon: MessageSquare },
+] as const;
+// Secondary: preserved and working, but not the current mission.
+const laterNav = [
+  { id: 'compare', label: 'AURA comparison', icon: GitCompareArrows },
   { id: 'registry', label: 'Tool registry', icon: Layers3 },
 ] as const;
 const icons = [Search, Box, GitCompareArrows, BookOpen, ShieldCheck];
@@ -215,6 +218,20 @@ export default function App() {
             </button>
           ))}
         </nav>
+        <span className="nav-label nav-label-later">LATER</span>
+        <nav aria-label="Secondary navigation" className="nav-later">
+          {laterNav.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              aria-current={view === id ? 'page' : undefined}
+              className={view === id ? 'active' : ''}
+              onClick={() => navigate(id)}
+            >
+              <Icon size={16} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
         <div className="recent-head">
           <span className="nav-label">RECENT MISSIONS</span>
           <span>{history.length}</span>
@@ -339,7 +356,7 @@ export default function App() {
                           <BookOpen size={14} /> Traceable answers
                         </span>
                         <span>
-                          <GitCompareArrows size={14} /> AURA comparison
+                          <Workflow size={14} /> Business processes
                         </span>
                       </div>
                     </div>

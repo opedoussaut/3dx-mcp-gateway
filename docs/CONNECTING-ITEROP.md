@@ -82,4 +82,6 @@ The fixture is `docs/blueprint/benchmarks/fixtures/synthetic-iterop.json`. It co
 | Start / complete / reassign …                                                                         | Blocked (0 calls).                                                                                 |
 | _Prepare_ to launch the contractor access form                                                        | Local draft `PREPARED — NOT SUBMITTED`.                                                            |
 
+**Process flows on the canvas are a SYNTHETIC illustration.** They are served by `GET /api/iterop/flows`, labelled `illustration: true`, and are not returned by any P0 operation. In live mode the canvas states that the flow is unavailable: a real flow needs the reviewed P1 operation `getProcessInfo`, and NOVA never draws stages it cannot evidence.
+
 The stdio MCP server exposes `iterop_list_startable_processes`, `iterop_list_my_tasks` and `iterop_get_process_summary`. They are synthetic by default; in live mode only admitted operations are exposed.

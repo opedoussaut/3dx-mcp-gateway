@@ -16,6 +16,12 @@ The v0.1 blueprint remains the architecture target. This implementation turns it
 
   The shell is rethemed to industrial blue, and the Inter font is bundled locally.
 
+- Visual polish:
+  - the selected process or task is shown as the canvas hero, with a stage flow, "You are here" and a context band. The flow is a SYNTHETIC illustration (`/api/iterop/flows`), and is unavailable in live mode until `getProcessInfo` is reviewed;
+  - business language in the primary UI; identifiers stay in Provenance, Evidence and Trace;
+  - Live is an explicit gate: no request is made and nothing falls back to synthetic data;
+  - mobile uses a My tasks | Processes switch and stacked provenance cards;
+  - AURA and the Tool registry sit under a secondary "Later" navigation group.
 - **LIVE: `BLOCKED`.** The FD04 schemas are pending (the file could not be retrieved), and no approved route or credential exists. See `docs/CONNECTING-ITEROP.md`.
 - Dataset Governance work is parked on the branch `claude/dataset-governance-parked`.
 

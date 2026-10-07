@@ -52,6 +52,11 @@ test('HTTP workflow isolates sessions, validates origins and preserves unknown A
       400,
     );
     assert.equal((await request('/apps/ITEROP/test', {})).status, 409);
+    const flows = await (await request('/iterop/flows')).json();
+    assert.equal(flows.source, 'synthetic');
+    assert.equal(flows.illustration, true);
+    assert.match(flows.notice, /SYNTHETIC ILLUSTRATION/);
+    assert.equal(flows.flows.syn_contractor_form.length, 5);
     assert.equal((await request('/apps/DATASET_CATALOG/test', {})).status, 404);
     assert.equal((await request('/apps/UNKNOWN/test', {})).status, 404);
     await request('/session/clear', {});

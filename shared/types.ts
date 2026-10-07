@@ -166,3 +166,14 @@ export type Provenance = {
   records: number;
   at: string;
 };
+export type FlowStage = {
+  id: string;
+  label: string;
+  kind: 'start' | 'review' | 'approval' | 'action' | 'end';
+};
+export type FlowIllustrations = {
+  source: 'synthetic';
+  illustration: true;
+  notice: string;
+  flows: Record<string, FlowStage[]>;
+};

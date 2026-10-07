@@ -10,7 +10,13 @@ async function navigate(page: Page, name: string) {
 const copilot = (page: Page) => page.getByRole('complementary', { name: 'NOVA Intelligence' });
 const canvas = (page: Page) => page.getByRole('region', { name: 'Business Process canvas' });
 const tasks = (page: Page) => page.getByRole('region', { name: 'My tasks' });
-const processes = (page: Page) => page.getByRole('region', { name: 'Available to start' });
+const processes = (page: Page) => page.getByRole('region', { name: 'Available processes' });
+const details = (page: Page) =>
+  page.getByRole('region', { name: 'Evidence, provenance and trace' });
+async function showProcesses(page: Page) {
+  const tab = page.getByRole('tab', { name: /Processes/ });
+  if (await tab.isVisible()) await tab.click();
+}
 async function ask(page: Page, prompt: string, mode?: 'Ask' | 'Investigate' | 'Prepare') {
   if (mode) await copilot(page).getByRole('button', { name: mode, exact: true }).click();
   await page.getByRole('textbox', { name: 'Ask NOVA about Business Process' }).fill(prompt);
@@ -26,40 +32,57 @@ test.beforeEach(async ({ page }) => {
   });
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Business Process', level: 1 })).toBeVisible();
-  await expect(tasks(page).getByText(/getTasksByUser · SYNTHETIC/)).toBeVisible();
+  await expect(tasks(page).getByRole('button')).toHaveCount(3);
 });
 test.afterEach(() => expect(external).toEqual([]));
 
-test('the workspace opens with my processes and tasks, each with FD04 provenance', async ({
-  page,
-}) => {
-  await expect(processes(page).getByRole('button')).toHaveCount(3);
-  await expect(processes(page).getByText(/getAllStartableProcesses · SYNTHETIC/)).toBeVisible();
-  await expect(tasks(page).getByRole('button')).toHaveCount(3);
-  await expect(copilot(page).getByRole('heading', { name: '3 current tasks' })).toBeVisible();
-  await page.getByRole('tab', { name: /Provenance/ }).click();
-  const provenance = page.getByRole('region', { name: 'Evidence, provenance and trace' });
-  await expect(provenance.getByText('GET /runtime/tasks')).toBeVisible();
-  await expect(provenance.getByText(/R2026x-FD04/)).toBeVisible();
-  await expect(provenance.getByText(/the user parameter is never sent/)).toBeVisible();
+test('opens on the most urgent task inside its process, in business language', async ({ page }) => {
+  await expect(
+    canvas(page).getByRole('heading', { name: 'Review contractor security form' }),
+  ).toBeVisible();
+  await expect(canvas(page).getByText('1 day overdue').first()).toBeVisible();
+  const stages = canvas(page).getByRole('list', { name: 'Process stages' });
+  await expect(stages.getByRole('listitem')).toHaveCount(5);
+  await expect(stages.locator('[aria-current="step"]')).toContainText('Security review');
+  await expect(stages.locator('[aria-current="step"]')).toContainText('You are here');
+  await expect(canvas(page).getByText(/Illustrative stages/)).toBeVisible();
+  await expect(canvas(page).getByText('SYNTHETIC').first()).toBeVisible();
+  // Technical identifiers stay out of the primary experience…
+  const primary = page.getByRole('complementary', { name: 'Your tasks and processes' });
+  for (const noise of ['getTasksByUser', 'getAllStartableProcesses', 'syn-task-', '/runtime/tasks'])
+    await expect(primary).not.toContainText(noise);
+  await expect(canvas(page)).not.toContainText('syn-task-');
+  // …and remain inspectable in Provenance.
+  await canvas(page)
+    .getByRole('button', { name: /Evidence/ })
+    .click();
+  await expect(
+    details(page).getByText('getTasksByUser').filter({ visible: true }).first(),
+  ).toBeVisible();
+  await expect(
+    details(page).getByText('GET /runtime/tasks').filter({ visible: true }).first(),
+  ).toBeVisible();
+  await expect(
+    details(page)
+      .getByText(/R2026x-FD04/)
+      .filter({ visible: true })
+      .first(),
+  ).toBeVisible();
 });
 test('one task + one question → one governed, cited answer', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await tasks(page)
-    .getByRole('button', { name: /Review contractor security form/ })
-    .click();
+  const task = tasks(page).getByRole('button', { name: /Approve quality impact/ });
+  await task.click();
+  await expect(task).toHaveAttribute('aria-pressed', 'true');
+  await expect(canvas(page).getByRole('heading', { name: 'Approve quality impact' })).toBeVisible();
+  await expect(canvas(page).locator('[aria-current="step"]')).toContainText('Quality approval');
+  await expect(copilot(page).getByLabel('Current context')).toContainText('Approve quality impact');
+  await canvas(page).getByRole('button', { name: 'Why does this need me?' }).click();
   await expect(
-    tasks(page).getByRole('button', { name: /Review contractor security form/ }),
-  ).toHaveAttribute('aria-pressed', 'true');
-  await expect(
-    canvas(page).getByRole('heading', { name: 'Review contractor security form' }),
-  ).toBeVisible();
-  await expect(canvas(page).getByLabel('Task timeline')).toContainText('Due');
-  await expect(copilot(page).getByLabel('Current context')).toContainText('syn-task-302');
-  await canvas(page).getByRole('button', { name: 'Why does this need my attention?' }).click();
-  await expect(
-    copilot(page).getByRole('heading', { name: 'Why syn-task-302 needs your attention' }),
+    copilot(page).getByRole('heading', {
+      name: 'Why “Approve quality impact” needs your attention',
+    }),
   ).toBeVisible();
   await expect(copilot(page).getByText(/does not infer a business cause/)).toBeVisible();
   const downloading = page.waitForEvent('download');
@@ -71,22 +94,27 @@ test('one task + one question → one governed, cited answer', async ({ page }) 
   expect(mission.provenance[0].operationId).toBe('getTasksByUser');
   expect(errors).toEqual([]);
 });
-test('process context resolves a name and explains it through getBasicProcessInfo', async ({
+test('a selected process becomes the canvas and is explained through getBasicProcessInfo', async ({
   page,
 }) => {
+  await showProcesses(page);
   await processes(page)
     .getByRole('button', { name: /Contractor access form/ })
     .click();
-  await expect(canvas(page).getByText(/getProcessInfo/)).toBeVisible();
+  await expect(canvas(page).getByRole('heading', { name: 'Contractor access form' })).toBeVisible();
+  await expect(canvas(page).getByText('Your tasks here')).toBeVisible();
+  await expect(canvas(page).getByText('Not available yet')).toBeVisible();
   await canvas(page).getByRole('button', { name: 'Explain this process' }).click();
   await expect(
     copilot(page).getByRole('heading', { name: 'Contractor access form' }),
   ).toBeVisible();
-  await ask(page, 'Explain the Contractor Form process.');
   await page.getByRole('tab', { name: /Provenance/ }).click();
-  const details = page.getByRole('region', { name: 'Evidence, provenance and trace' });
-  await expect(details.getByText('getAllStartableProcesses', { exact: true })).toBeVisible();
-  await expect(details.getByText('getBasicProcessInfo', { exact: true })).toBeVisible();
+  await expect(
+    details(page).getByText('getAllStartableProcesses').filter({ visible: true }).first(),
+  ).toBeVisible();
+  await expect(
+    details(page).getByText('getBasicProcessInfo').filter({ visible: true }).first(),
+  ).toBeVisible();
 });
 test('P0 natural-language questions in English and French', async ({ page }) => {
   for (const [q, heading] of [
@@ -96,12 +124,13 @@ test('P0 natural-language questions in English and French', async ({ page }) => 
     ['What should I work on first?', 'Start with Review contractor security form'],
     ['Show my overdue tasks.', '1 overdue task'],
     ['Quelles sont mes tâches en cours ?', '3 current tasks'],
+    ['Explain the Contractor Form process.', 'Contractor access form'],
   ]) {
     await ask(page, q);
     await expect(copilot(page).getByRole('heading', { name: heading })).toBeVisible();
   }
 });
-test('cross-user, write, denial and live states are terminal and explicit', async ({ page }) => {
+test('cross-user, write and denial outcomes are terminal and explicit', async ({ page }) => {
   await ask(page, "Show Alice's tasks");
   await expect(
     copilot(page).getByRole('heading', { name: "Other people's tasks are out of scope" }),
@@ -109,8 +138,8 @@ test('cross-user, write, denial and live states are terminal and explicit', asyn
   await expect(copilot(page).getByText('0 tool calls')).toBeVisible();
   for (const q of [
     'Start the contractor access form',
-    'Complete syn-task-301',
-    'Reassign syn-task-302 to Bob',
+    'Complete the approve quality impact task',
+    'Reassign my review task to Bob',
   ]) {
     await ask(page, q);
     await expect(
@@ -124,18 +153,31 @@ test('cross-user, write, denial and live states are terminal and explicit', asyn
   await ask(page, 'Prepare to launch the contractor access form', 'Prepare');
   await expect(copilot(page).getByText('prepared — not submitted', { exact: true })).toBeVisible();
   await expect(canvas(page).getByText('PREPARED — NOT SUBMITTED')).toBeVisible();
-  await page
+});
+test('Live is an explicit gate: no connection implied, no request, no synthetic fallback', async ({
+  page,
+}) => {
+  const missions: string[] = [];
+  page.on(
+    'request',
+    (r) => r.url().endsWith('/api/missions') && r.method() === 'POST' && missions.push(r.url()),
+  );
+  const live = page
     .getByRole('group', { name: 'Business Process source' })
-    .getByRole('button', { name: 'Live' })
-    .click();
-  await expect(tasks(page).getByRole('button', { name: /Load my tasks/ })).toBeVisible();
-  await tasks(page)
-    .getByRole('button', { name: /Load my tasks/ })
-    .click();
+    .getByRole('button', { name: 'Live' });
+  await live.click();
+  await expect(live).toHaveAttribute('aria-pressed', 'true');
   await expect(
-    copilot(page).getByRole('heading', { name: 'Your Business Process connection needs approval' }),
+    canvas(page).getByRole('heading', { name: 'Live access is not approved yet' }),
   ).toBeVisible();
-  await copilot(page).getByRole('button', { name: 'Review access requirements' }).click();
+  await expect(canvas(page).getByText('LIVE', { exact: true })).toBeVisible();
+  await expect(canvas(page).getByText('SYNTHETIC', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: 'Ask NOVA about Business Process' })).toHaveCount(
+    0,
+  );
+  await expect(tasks(page).getByRole('button', { name: /Not connected/ })).toBeVisible();
+  expect(missions).toEqual([]);
+  await canvas(page).getByRole('button', { name: 'View connection requirements' }).click();
   const card = page.getByRole('article', { name: 'Business Process connection' });
   await expect(card.getByText(/^LIVE BLOCKED/)).toBeVisible();
   await expect(card.getByRole('button', { name: 'Test Business Process read' })).toBeDisabled();
@@ -147,12 +189,26 @@ test('keyboard alone can select a task and ask about it', async ({ page }) => {
   await task.focus();
   await page.keyboard.press('Enter');
   await expect(task).toHaveAttribute('aria-pressed', 'true');
-  const why = canvas(page).getByRole('button', { name: 'Why does this need my attention?' });
+  const why = canvas(page).getByRole('button', { name: 'Why does this need me?' });
   await why.focus();
   await page.keyboard.press('Enter');
   await expect(
-    copilot(page).getByRole('heading', { name: 'Why syn-task-301 needs your attention' }),
+    copilot(page).getByRole('heading', {
+      name: 'Why “Approve quality impact” needs your attention',
+    }),
   ).toBeVisible();
+});
+test('mobile uses a full-width list switch instead of a partial rail', async ({ page }) => {
+  const narrow = (page.viewportSize()?.width || 0) <= 960;
+  test.skip(!narrow, 'Mobile composition only');
+  await expect(processes(page)).toBeHidden();
+  await page.getByRole('tab', { name: /Processes/ }).click();
+  await expect(processes(page)).toBeVisible();
+  await expect(tasks(page)).toBeHidden();
+  const box = await processes(page).boundingBox();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  await expect(page.getByRole('list', { name: 'Provenance' })).toBeVisible();
 });
 test('Business Process workspace has no serious accessibility violations or overflow', async ({
   page,
@@ -165,12 +221,18 @@ test('Business Process workspace has no serious accessibility violations or over
       targets: v.nodes.map((n) => n.target),
     }));
   expect(await axe()).toEqual([]);
-  await tasks(page)
-    .getByRole('button', { name: /Review contractor security form/ })
+  await showProcesses(page);
+  await processes(page)
+    .getByRole('button', { name: /Tooling purchase request/ })
     .click();
   await page.getByRole('tab', { name: /Provenance/ }).click();
   expect(await axe()).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page
+    .getByRole('group', { name: 'Business Process source' })
+    .getByRole('button', { name: 'Live' })
+    .click();
+  expect(await axe()).toEqual([]);
   await navigate(page, 'Connections');
   expect(await axe()).toEqual([]);
 });
