@@ -2,6 +2,8 @@
 
 A natural-language workspace for engineering missions on 3DEXPERIENCE, with a governed semantic MCP gateway and an AURA observation lab.
 
+**Claude project handover:** Read [CLAUDE.md](CLAUDE.md) for implementation ownership and [the full handover](docs/CLAUDE-HANDOVER.md) for the verified baseline, architecture, setup, limitations, and continuation backlog.
+
 ![NOVA mission control](docs/screenshots/workspace.png)
 
 **This repository contains a runnable application.** It starts with a synthetic engineering corpus and needs no platform credentials or model subscription. Live platform reads require private configuration and reviewed API contracts for the target release. No real tenant connection or AURA evaluation has been performed by this project.
