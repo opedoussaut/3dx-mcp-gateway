@@ -2,75 +2,103 @@ import fixture from '../../docs/blueprint/benchmarks/fixtures/synthetic-iterop.j
 import type { Coverage, Evidence, Source } from '../../shared/types';
 import { GatewayError, atPath, boundedGetJson } from '../http';
 import type { IteropConfig } from './config';
+import type { BasicProcessInfo, StartableProcessesList, TaskInstanceBasic } from './fd04';
 import { operation, type OperationSpec } from './operations';
 
 export type IteropArgs = { processKey?: string };
 export type IteropResult = { records: Evidence[]; coverage: Coverage; spec: OperationSpec };
 type Scalar = string | number | boolean;
+export type StartDateUnit = 'ms' | 's' | 'unverified';
 
-const day = 86_400_000;
-const dateAt = (offset?: number) =>
-  offset === undefined ? undefined : new Date(Date.now() + offset * day).toISOString().slice(0, 10);
-const clean = (row: Record<string, Scalar | undefined>) =>
-  Object.fromEntries(Object.entries(row).filter(([, v]) => v !== undefined)) as Record<
-    string,
-    Scalar
-  >;
-const toEvidence = (
-  spec: OperationSpec,
-  row: Record<string, Scalar>,
-  source: Source,
-): Evidence => ({
-  id: String(row.id),
-  title: String(row.name),
-  kind: spec.recordKind,
-  source,
-  fields: row,
-  retrievedAt: new Date().toISOString(),
-});
 export const PROCESS_KEY = /^[A-Za-z0-9_.:-]{1,200}$/;
+const MAX_ROWS = 100;
+const day = 86_400_000;
 
-/** Synthetic, principal-scoped behaviour: self-only tasks, invisible process denial. */
-function synthetic(spec: OperationSpec, args: IteropArgs): Record<string, Scalar>[] {
-  const process = (p: (typeof fixture.processes)[number]) =>
-    clean({
-      id: p.processKey,
-      name: p.name,
-      description: p.description,
-      version: p.version,
-      category: p.category,
-    });
+/**
+ * Synthetic responses in the exact FD04 shapes. Fixture-only controls (startable, visible,
+ * assignee, startOffsetDays) never appear in a response. Synthetic startDate is epoch milliseconds.
+ */
+export function syntheticResponse(spec: OperationSpec, args: IteropArgs): unknown {
   switch (spec.name) {
     case 'iterop.list_startable_processes':
-      return fixture.processes.filter((p) => p.startable).map(process);
+      return {
+        responses: fixture.processes
+          .filter((p) => p.startable)
+          .map(({ key, name, version }) => ({ key, name, version })),
+      } satisfies StartableProcessesList;
     case 'iterop.list_my_tasks':
       return fixture.tasks
-        .filter((t) => t.assignee === 'self' && t.status === 'OPEN')
-        .map((t) =>
-          clean({
-            id: t.taskId,
-            name: t.name,
-            processKey: t.processKey,
-            processName: fixture.processes.find((p) => p.processKey === t.processKey)?.name,
-            processInstanceId: t.processInstanceId,
-            step: t.step,
-            status: t.status,
-            priority: t.priority,
-            dueDate: dateAt(t.dueOffsetDays),
-            createdAt: dateAt(t.createdOffsetDays),
-          }),
-        );
+        .filter((t) => t.assignee === 'self')
+        .map(({ id, name, description, priority, startOffsetDays, process }) => ({
+          id,
+          name,
+          description,
+          priority,
+          startDate: Date.now() + startOffsetDays * day,
+          process,
+        })) satisfies TaskInstanceBasic[];
     case 'iterop.get_process_summary': {
-      const found = fixture.processes.find((p) => p.processKey === args.processKey);
-      if (!found) throw new GatewayError('NOT_FOUND', 'No process has that key.');
-      if ((found as { visible?: boolean }).visible === false)
-        throw new GatewayError(
-          'AUTHORIZATION_DENIED',
-          'The business process service denied access to this process for the current principal.',
-        );
-      return [process(found)];
+      const found = fixture.processes.find(
+        (p) => p.key === args.processKey && (p as { visible?: boolean }).visible !== false,
+      );
+      // FD04 documents 404 "Process unknown" for a key that cannot be read.
+      if (!found)
+        throw new GatewayError('NOT_FOUND', 'Process unknown. Check the provided process key.');
+      const { key, name, description, version, icon } = found;
+      return { key, name, description, version, icon } satisfies BasicProcessInfo;
     }
   }
+}
+
+/** FD04 validation, then allowlisted projection. Identical for synthetic and live bodies. */
+export function project(
+  spec: OperationSpec,
+  body: unknown,
+  source: Source,
+  startDateUnit: StartDateUnit,
+): { records: Evidence[]; coverage: Coverage } {
+  const parsed = spec.response.safeParse(body);
+  if (!parsed.success)
+    throw new GatewayError(
+      'SCHEMA_MISMATCH',
+      `The response does not match the ${spec.operationId} schema (R2026x-FD04).`,
+    );
+  const rows =
+    spec.rows.kind === 'property'
+      ? (atPath(parsed.data, spec.rows.property) ?? [])
+      : spec.rows.kind === 'array'
+        ? parsed.data
+        : [parsed.data];
+  const all = rows as unknown[];
+  const retrievedAt = new Date().toISOString();
+  const records = all.slice(0, MAX_ROWS).map((row) => {
+    const fields: Record<string, Scalar> = {};
+    for (const [key, path] of Object.entries(spec.mapping)) {
+      const value = atPath(row, path);
+      if (typeof value === 'string') fields[key] = value.slice(0, 4000);
+      else if (typeof value === 'number' && Number.isFinite(value)) fields[key] = value;
+    }
+    // Derived only when the unit is known: synthetic data, or a live unit proven and recorded.
+    if (typeof fields.startDate === 'number' && startDateUnit !== 'unverified')
+      fields.startedAt = new Date(
+        startDateUnit === 'ms' ? fields.startDate : fields.startDate * 1000,
+      ).toISOString();
+    if (spec.required.some((f) => fields[f] === undefined || fields[f] === ''))
+      throw new GatewayError(
+        'SCHEMA_MISMATCH',
+        `A ${spec.operationId} record lacks ${spec.required.join(' or ')}; NOVA cannot cite it.`,
+      );
+    return {
+      id: String(fields.id),
+      title: String(fields.name),
+      kind: spec.recordKind,
+      source,
+      fields,
+      retrievedAt,
+    } satisfies Evidence;
+  });
+  // FD04 documents these operations as returning all matching records (no paging fields).
+  return { records, coverage: all.length > MAX_ROWS ? 'partial' : 'complete' };
 }
 
 export class IteropConnector {
@@ -90,11 +118,7 @@ export class IteropConnector {
     if (args.processKey !== undefined && !PROCESS_KEY.test(args.processKey))
       throw new GatewayError('INVALID_ID', 'The process key is not valid for this adapter.');
     if (source === 'synthetic')
-      return {
-        records: synthetic(spec, args).map((r) => toEvidence(spec, r, 'synthetic')),
-        coverage: 'complete',
-        spec,
-      };
+      return { ...project(spec, syntheticResponse(spec, args), 'synthetic', 'ms'), spec };
     return this.live(spec, args);
   }
   /** Fully assembled request URL for a bound operation. Exported for tests and diagnostics. */
@@ -117,8 +141,9 @@ export class IteropConnector {
         'NOT_CONFIGURED',
         'Live ITEROP access is blocked. Complete its private connection checklist.',
       );
-    const binding = this.config.contract?.operations[spec.name];
-    if (!binding)
+    const contract = this.config.contract;
+    const binding = contract?.operations[spec.name];
+    if (!contract || !binding)
       throw new GatewayError(
         'UNVERIFIED_OPERATION',
         'This operation has no reviewed contract for the configured release.',
@@ -126,51 +151,14 @@ export class IteropConnector {
     if (binding.method !== 'GET' || !binding.readOnly || binding.operationId !== spec.operationId)
       throw new GatewayError('WRITE_BLOCKED', 'Only the reviewed read operations are supported.');
     const headers: Record<string, string> = { Authorization: this.config.authorization! };
-    if (this.config.contract?.securityContext === 'REQUIRED')
+    if (contract.securityContext === 'REQUIRED')
       headers.SecurityContext = this.config.securityContext!;
-    const raw = await boundedGetJson(
+    const body = await boundedGetJson(
       this.request,
       this.url(spec, args),
       headers,
       'business process service',
     );
-    const rows = binding.rowsPath ? atPath(raw, binding.rowsPath) : raw;
-    if (!rows || typeof rows !== 'object')
-      throw new GatewayError(
-        'SCHEMA_MISMATCH',
-        'The response does not match the reviewed row mapping.',
-      );
-    const allRows = Array.isArray(rows) ? rows : [rows];
-    const projected = allRows.slice(0, 100).map((row) =>
-      Object.fromEntries(
-        Object.entries(binding.fields)
-          .filter(([key]) => spec.fields.includes(key))
-          .flatMap<[string, Scalar]>(([key, path]) => {
-            const value = atPath(row, path);
-            if (typeof value === 'string') return [[key, value.slice(0, 4000)]];
-            if (typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value)))
-              return [[key, value]];
-            return [];
-          }),
-      ),
-    );
-    if (projected.some((r) => spec.required.some((f) => r[f] === undefined || r[f] === '')))
-      throw new GatewayError(
-        'SCHEMA_MISMATCH',
-        'Required fields are missing from the reviewed mapping.',
-      );
-    const total = binding.totalPath ? atPath(raw, binding.totalPath) : undefined;
-    const complete = binding.completePath ? atPath(raw, binding.completePath) : undefined;
-    const coverage: Coverage =
-      allRows.length > 100
-        ? 'partial'
-        : (spec.shape === 'detail' && projected.length === 1) ||
-            complete === true ||
-            (typeof total === 'number' && Number.isInteger(total) && total === projected.length)
-          ? 'complete'
-          : complete === false || (typeof total === 'number' && total > projected.length)
-            ? 'partial'
-            : 'unknown';
-    return { records: projected.map((r) => toEvidence(spec, r, 'live')), coverage, spec };
+    return { ...project(spec, body, 'live', contract.taskStartDateUnit), spec };
   }
 }

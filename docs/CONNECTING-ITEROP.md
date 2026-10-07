@@ -6,20 +6,23 @@ This is an operator document, so it names the vendor product. The user-facing sh
 
 ## 1. Specification of record
 
-- **Source:** R2026x-FD04 Business Process API v2, `businessprocess_v2.openapi.json`. The URL is in [`references/ITEROP-R2026x-FD04-OPENAPI.md`](references/ITEROP-R2026x-FD04-OPENAPI.md). Only the link is stored in this repository; the vendor document is not copied.
-- **Retrieval attempt (7 Oct 2026):** this development environment's egress proxy refused `media.3ds.com` (`curl: (22) … 403`, proxy `connect_rejected`). **NOVA has not parsed the JSON.** The inventory below is limited to facts already recorded on `main` from that release document: operationId, method, path, and the `login`/`user` constraints. No contract detail was taken from search snippets.
+The official R2026x-FD04 `businessprocess_v2.openapi.json` has been **parsed and verified**:
 
-## 2. Operation inventory (public-safe summary)
+- SHA-256 `90212fe7…6326e`;
+- OpenAPI 3.1.0, API version 2.0.0;
+- 50 paths, 78 operations.
 
-| NOVA semantic operation           | operationId                | Method and path                                | Scope rule enforced by NOVA                                                                                                                | Status                                             |
-| --------------------------------- | -------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
-| `iterop.list_startable_processes` | `getAllStartableProcesses` | `GET /repository/processes/startable/list`     | Human caller: the `login` parameter is never sent.                                                                                         | Inventory recorded from FD04. Schemas **pending**. |
-| `iterop.list_my_tasks`            | `getTasksByUser`           | `GET /runtime/tasks`                           | Self only: `user` (and `login`) are never sent. Prompts asking for someone else's tasks are refused before any call.                       | Inventory recorded from FD04. Schemas **pending**. |
-| `iterop.get_process_summary`      | `getBasicProcessInfo`      | `GET /repository/processes/{processKey}/basic` | `processKey` is either typed exactly or resolved from your own startable list. It is validated (`[A-Za-z0-9_.:-]{1,200}`) and URL-encoded. | Inventory recorded from FD04. Schemas **pending**. |
+The file is kept only in the Git-ignored `.private/` folder. NOVA's public-safe summary of the three P0 contracts is in **[iterop/FD04-CONTRACTS.md](iterop/FD04-CONTRACTS.md)**. `npm run iterop:openapi` re-resolves them, and `tests/iterop-fd04.test.ts` checks them against the private file whenever it is present.
 
-**Not implemented (P1, after contract validation):** `getProcessInfo`, `getTaskInstanceInformations`, `getInstanceInfo`, `getHistoryUserTasks`.
+## 2. Operation inventory
 
-**Out of scope, and impossible to bind:** `startProcess` (`POST /runtime/processes/{processKey}`), task completion, assignment changes and model deployment. The contract schema accepts only the three operationIds above, with `GET`, `readOnly: true` and `principalScoped: true`.
+| NOVA semantic operation           | operationId                | Method and path                                | Scope rule enforced by NOVA                                                                                                                                                                         | Status                    |
+| --------------------------------- | -------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `iterop.list_startable_processes` | `getAllStartableProcesses` | `GET /repository/processes/startable/list`     | Human caller; `login` is never sent (FD04: sending it is forbidden).                                                                                                                                | **Verified against FD04** |
+| `iterop.list_my_tasks`            | `getTasksByUser`           | `GET /runtime/tasks`                           | `user`, `login` and `processInstanceId` are never sent. Prompts asking for someone else's tasks are refused before any call. Self-scope without `user` is **undocumented** and must be proven live. | **Verified against FD04** |
+| `iterop.get_process_summary`      | `getBasicProcessInfo`      | `GET /repository/processes/{processKey}/basic` | `processKey` is typed exactly or resolved from your own startable list, then validated and URL-encoded.                                                                                             | **Verified against FD04** |
+
+"Verified" means the operation is documented in FD04 and NOVA's request, response validation and projection match that document. It does **not** mean the operation is enabled or authorized on the tenant.
 
 ## 3. What NOVA enforces regardless of the contract
 
@@ -30,57 +33,30 @@ This is an operator document, so it names the vendor product. The user-facing sh
 - **Synthetic mode makes no network call,** even when a live configuration is present. This is tested with a request spy and by recording browser requests.
 - **Writes:** start, complete, claim, assign or reassign, approve, cancel and deploy are refused before any call, in every mode. Prepare mode produces only a local draft marked `PREPARED — NOT SUBMITTED`.
 
-## 4. What I still need from the specification
+## 4. Authentication analysis and minimum access request
 
-The file cannot be retrieved here, so please supply `businessprocess_v2.openapi.json` (R2026x-FD04) as a private file attachment, or paste these sections only. I need:
+See **[iterop/ACCESS-REQUEST.md](iterop/ACCESS-REQUEST.md)**. It separates what the specification declares (HTTP Basic only, placeholder servers, human-user semantics) from what the tenant must still confirm. It also contains the message to send to the administrator.
 
-1. `openapi`, `info`, `servers`, `security` and `components.securitySchemes`.
-2. For `getAllStartableProcesses`, `getTasksByUser` and `getBasicProcessInfo`:
-   - all `parameters` (names, `in`, required flags, schemas, descriptions — especially `login`, `user` and `processInstanceId`);
-   - the `200` response schema, every `$ref` it uses under `components.schemas`, and any pagination fields;
-   - the documented error status codes (`400`, `401`, `403`, `404` and others).
+## 5. First live read
 
-With that, I will:
-
-- replace NOVA's normalized field names with a reviewed mapping;
-- align the synthetic fixtures to the real response shapes;
-- set `requestSchemaReviewed` and `responseSchemaReviewed` honestly in a private contract;
-- add schema-conformance tests.
-
-## 5. Requirements for the first LIVE read
-
-Obtain these privately, through the platform owner. Never put them in chat, issues or commits.
-
-1. **A sanctioned route** (one of the following). Play sign-in alone is UI access only and does not count.
-   - **API Gateway:** requires the **PFI** role, which Olivier does not hold. A PFI holder or the platform owner must provision it.
-   - **Standalone ITEROP REST access:** an ITEROP administrator issues a read-only access key and secret (HTTP Basic). JWT is not compatible with API v2.
-2. **Deployment facts:**
-   - the exact service origin (HTTPS, no path) and any base path;
-   - the deployed release and API version (a different release requires re-review);
-   - the required headers (for example, whether a `SecurityContext` is needed);
-   - how the identity is represented for "my" tasks.
-3. **A least-privilege, read-only credential,** stored only in the private `.env` (`NOVA_ITEROP_ACCESS_KEY` and `NOVA_ITEROP_SECRET_KEY`, or `NOVA_ITEROP_ACCESS_TOKEN`).
-4. **One non-confidential test process and your task-list result** (empty is fine), with the values you independently expect.
-5. **Data-handling approval:** confirmation that NOVA may process these responses locally. Live responses must not leave the machine, and no model egress is allowed.
-
-Then copy `config/iterop-contract.template.json` to `.private/iterop-contract.json`, bind the three operations with the reviewed field mapping, set the `NOVA_ITEROP_*` variables, restart NOVA, and run **Connections → Test Business Process read**.
+See **[iterop/FIRST-LIVE-TEST.md](iterop/FIRST-LIVE-TEST.md)** for the three governed tests, the comparison with ITEROP Play, and the PASS / PARTIAL / DENIED / FAIL definitions.
 
 ## 6. Synthetic slice (reproducible)
 
-The fixture is `docs/blueprint/benchmarks/fixtures/synthetic-iterop.json`. It contains invented names and keys, uses NOVA-normalized fields, and computes dates relative to today.
+The fixture is `docs/blueprint/benchmarks/fixtures/synthetic-iterop.json`. It contains invented names and keys, and its responses have the exact FD04 shapes (`{ responses: [...] }`, the `GetTaskInstanceBasicResponse` array, and `GetBasicProcessInfoResponse`). They pass through the same validation and projection as live bodies. Synthetic `startDate` values are epoch milliseconds relative to today.
 
-| Question                                                                                              | Outcome                                                                                            |
-| ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| Which processes can I start? / What workflows are available to me? / Quels processus puis-je lancer ? | 3 processes (`getAllStartableProcesses`). The non-startable and restricted processes are absent.   |
-| What are my current tasks? / Quelles sont mes tâches en cours ?                                       | 3 of my tasks (`getTasksByUser`). Another user's task never appears.                               |
-| What should I work on first?                                                                          | Ranked by due date, then priority. This is stated as a transparent rule, not a business judgement. |
-| Show my overdue tasks.                                                                                | 1 overdue task. Undated tasks are called out as unclassifiable.                                    |
-| Explain the Contractor Form process.                                                                  | The name resolves against my startable list, then `getBasicProcessInfo` is called.                 |
-| What is this workflow?                                                                                | `needs_input`: NOVA lists candidates and never guesses.                                            |
-| Explain process key `syn_restricted_audit`                                                            | **Access denied for this identity** (terminal).                                                    |
-| Show Alice's tasks                                                                                    | Blocked: other people's tasks are out of scope (0 calls).                                          |
-| Start / complete / reassign …                                                                         | Blocked (0 calls).                                                                                 |
-| _Prepare_ to launch the contractor access form                                                        | Local draft `PREPARED — NOT SUBMITTED`.                                                            |
+| Question                                                                                              | Outcome                                                                                                                           |
+| ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Which processes can I start? / What workflows are available to me? / Quels processus puis-je lancer ? | 3 processes (`getAllStartableProcesses`). The non-startable and restricted processes are absent.                                  |
+| What are my current tasks? / Quelles sont mes tâches en cours ?                                       | 3 of my tasks (`getTasksByUser`). Another user's task never appears.                                                              |
+| What should I work on first? / Which task has been waiting longest?                                   | Ranked by waiting time (`startDate`), stated as a transparent rule. FD04 has no due date, and its priority scale is undocumented. |
+| Show my overdue tasks.                                                                                | `insufficient_evidence`: FD04 `getTasksByUser` returns no due date.                                                               |
+| Explain the Contractor Form process.                                                                  | The name resolves against my startable list, then `getBasicProcessInfo` is called.                                                |
+| What is this workflow?                                                                                | `needs_input`: NOVA lists candidates and never guesses.                                                                           |
+| Explain process key `syn_restricted_audit`                                                            | `needs_input`: “Process unknown” (FD04 documents 404 here, not 403). Live 401/403 are terminal and covered by tests.              |
+| Show Alice's tasks                                                                                    | Blocked: other people's tasks are out of scope (0 calls).                                                                         |
+| Start / complete / reassign …                                                                         | Blocked (0 calls).                                                                                                                |
+| _Prepare_ to launch the contractor access form                                                        | Local draft `PREPARED — NOT SUBMITTED`.                                                                                           |
 
 **Process flows on the canvas are a SYNTHETIC illustration.** They are served by `GET /api/iterop/flows`, labelled `illustration: true`, and are not returned by any P0 operation. In live mode the canvas states that the flow is unavailable: a real flow needs the reviewed P1 operation `getProcessInfo`, and NOVA never draws stages it cannot evidence.
 

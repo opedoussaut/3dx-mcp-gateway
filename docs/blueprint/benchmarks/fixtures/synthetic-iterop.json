@@ -1,102 +1,104 @@
 {
-  "notice": "SYNTHETIC FIXTURE. Invented business-process data for NOVA testing. Not derived from any tenant, customer, screenshot or real ITEROP deployment. Field names are NOVA-normalized; upstream field mapping comes only from a reviewed private contract.",
-  "principal": {
-    "displayName": "Demo operator"
-  },
+  "notice": "SYNTHETIC FIXTURE. Invented business-process data for NOVA testing, shaped as R2026x-FD04 Business Process API v2 responses (GetAllStartableProcessesInfoList, GetTaskInstanceBasicResponse, GetBasicProcessInfoResponse). Not derived from any tenant, customer or screenshot. Fields ending in 'OffsetDays', 'startable', 'visible' and 'assignee' are fixture controls, not API fields.",
   "processes": [
     {
-      "processKey": "syn_engineering_change",
+      "key": "syn_engineering_change",
       "name": "Engineering change request",
       "description": "Request, assess and approve a design change before release to manufacturing.",
-      "version": "3",
-      "category": "Engineering",
+      "version": 3,
+      "icon": "Synthetic icon.",
       "startable": true
     },
     {
-      "processKey": "syn_contractor_form",
+      "key": "syn_contractor_form",
       "name": "Contractor access form",
       "description": "Request site and system access for an external contractor, with security review and badge provisioning.",
-      "version": "2",
-      "category": "Operations",
+      "version": 2,
+      "icon": "Synthetic icon.",
       "startable": true
     },
     {
-      "processKey": "syn_tooling_purchase",
+      "key": "syn_tooling_purchase",
       "name": "Tooling purchase request",
       "description": "Request budget approval and a purchase order for production tooling.",
-      "version": "5",
-      "category": "Procurement",
+      "version": 5,
+      "icon": "Synthetic icon.",
       "startable": true
     },
     {
-      "processKey": "syn_supplier_onboarding",
+      "key": "syn_supplier_onboarding",
       "name": "Supplier onboarding",
       "description": "Qualify and register a new supplier.",
-      "version": "4",
-      "category": "Procurement",
+      "version": 4,
+      "icon": "Synthetic icon.",
       "startable": false
     },
     {
-      "processKey": "syn_restricted_audit",
+      "key": "syn_restricted_audit",
       "name": "Restricted audit",
       "description": "Restricted.",
-      "version": "1",
-      "category": "Restricted",
+      "version": 1,
+      "icon": "Synthetic icon.",
       "startable": false,
       "visible": false
     }
   ],
   "tasks": [
     {
-      "taskId": "syn-task-301",
-      "name": "Approve quality impact",
-      "processKey": "syn_engineering_change",
-      "processInstanceId": "syn-inst-1042",
-      "status": "OPEN",
-      "priority": "HIGH",
-      "dueOffsetDays": 1,
-      "createdOffsetDays": -4,
-      "assignee": "self",
-      "step": "quality_approval"
-    },
-    {
-      "taskId": "syn-task-302",
+      "id": "syn-task-302",
       "name": "Review contractor security form",
-      "processKey": "syn_contractor_form",
-      "processInstanceId": "syn-inst-1057",
-      "status": "OPEN",
-      "priority": "MEDIUM",
-      "dueOffsetDays": -1,
-      "createdOffsetDays": -3,
-      "assignee": "self",
-      "step": "security_review"
+      "description": "Check the contractor's security declaration before access is granted.",
+      "priority": 50,
+      "startOffsetDays": -3,
+      "process": {
+        "identificator": "Contractor access — test lab",
+        "instanceId": "syn-inst-1057",
+        "name": "Contractor access form"
+      },
+      "assignee": "self"
     },
     {
-      "taskId": "syn-task-305",
+      "id": "syn-task-301",
+      "name": "Approve quality impact",
+      "description": "Approve or reject the quality impact of the proposed change.",
+      "priority": 80,
+      "startOffsetDays": -2,
+      "process": {
+        "identificator": "ECR — fan bracket stiffness",
+        "instanceId": "syn-inst-1042",
+        "name": "Engineering change request"
+      },
+      "assignee": "self"
+    },
+    {
+      "id": "syn-task-305",
       "name": "Confirm test-lab calibration evidence",
-      "processKey": "syn_engineering_change",
-      "processInstanceId": "syn-inst-1042",
-      "status": "OPEN",
-      "priority": "LOW",
-      "createdOffsetDays": -2,
-      "assignee": "self",
-      "step": "impact_assessment"
+      "description": "Confirm that calibration evidence is attached for the test bench.",
+      "priority": 20,
+      "startOffsetDays": -1,
+      "process": {
+        "identificator": "ECR — fan bracket stiffness",
+        "instanceId": "syn-inst-1042",
+        "name": "Engineering change request"
+      },
+      "assignee": "self"
     },
     {
-      "taskId": "syn-task-310",
+      "id": "syn-task-310",
       "name": "Board sign-off",
-      "processKey": "syn_engineering_change",
-      "processInstanceId": "syn-inst-1042",
-      "status": "OPEN",
-      "priority": "HIGH",
-      "dueOffsetDays": 6,
-      "createdOffsetDays": -1,
-      "assignee": "another-user",
-      "step": "change_board"
+      "description": "Change board decision.",
+      "priority": 80,
+      "startOffsetDays": 0,
+      "process": {
+        "identificator": "ECR — fan bracket stiffness",
+        "instanceId": "syn-inst-1042",
+        "name": "Engineering change request"
+      },
+      "assignee": "another-user"
     }
   ],
   "flows": {
-    "notice": "SYNTHETIC ILLUSTRATION. Not returned by any P0 operation. A live flow needs getProcessInfo (P1, not admitted).",
+    "notice": "SYNTHETIC ILLUSTRATION. Stages and task placements are not returned by any P0 operation (FD04 getTasksByUser has no step field). A live flow needs getProcessInfo (P1, not admitted).",
     "syn_engineering_change": [
       {
         "id": "request",
@@ -177,6 +179,12 @@
         "label": "Complete",
         "kind": "end"
       }
-    ]
+    ],
+    "placements": {
+      "syn-task-302": "security_review",
+      "syn-task-301": "quality_approval",
+      "syn-task-305": "impact_assessment",
+      "syn-task-310": "change_board"
+    }
   }
 }
