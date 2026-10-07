@@ -9,6 +9,10 @@ Olivier has provided a **Business Process API OpenAPI 3.1 document**, API `versi
 
 **The development order is now: ITEROP (first) → Dataset Governance (later) → AURA comparison (after live integration value).** Preserve pre-existing Dataset Governance and AURA work, but defer their feature expansion.
 
+**Official API contract supplied by Olivier (R2026x-FD04):**
+- https://media.3ds.com/support/documentation/developer/cloud/R2026x-FD04/en/English/CAABusinessProcessWS/businessprocess_v2.openapi.json
+- Safe Claude Code retrieval/verification instructions: [ITEROP-R2026x-FD04-OPENAPI.md](../references/ITEROP-R2026x-FD04-OPENAPI.md). Exact release-scoped documentation link is now persistent in this repository; validate the target tenant separately.
+
 **Public references (for links, not copying vendor documentation):**
 - https://doc.iterop.com/kb/utiliser-lapi-rest-2/ — standalone Iterop REST authentication; v2 does **not** support JWT, and REST access keys are provisioned from an Admin interface.
 - https://3dswym.3dexperience.3ds.com/wiki/3dexperience-platform-user-s-community/business-process-designer_fu5BkDD5SJiXJh1RndAgjg — platform notes: ITEROP API via API Gateway, **PFI role mandatory** for that path.
