@@ -9,6 +9,12 @@ description: Implement and verify NOVA's ITEROP Business Process natural-languag
 
 Read **`docs/missions/NOVA-003-ITEROP-FIRST.md`**, `docs/CONNECTING.md`, `CLAUDE.md`, `docs/IMPLEMENTATION.md`, and the existing Gateway implementation before changing code. For UI tasks, also invoke `/nova-gen7-design`.
 
+## Authoritative release documentation — open this FIRST
+
+Olivier supplied the **official versioned R2026x-FD04 Business Process v2 OpenAPI JSON URL**. Read `docs/references/ITEROP-R2026x-FD04-OPENAPI.md` for the exact source and safe retrieval instructions; when network policy permits, fetch and parse the real JSON before implementation. This resolves the prior ambiguity that Claude only had an unnamed user-provided attachment.
+
+Treat the document as the **release-scoped API specification**, not proof of access/permission on Olivier's tenant. If remote retrieval fails, request a file attachment supplied through an approved Claude/corporate workflow; do not invent contract details or commit the full vendor document to this public repo.
+
 ## What is known and what is not
 
 - Olivier has **Play only**, not Design/Admin; being signed in to the Player does **not** grant REST/API Gateway access, credentials or process-administration rights.
