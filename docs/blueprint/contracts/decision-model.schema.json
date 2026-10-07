@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NOVA decision model abstraction",
+  "$defs": {
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "feature_schema_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minimized_state": {
+          "type": "object"
+        },
+        "allowed_decisions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 2
+        },
+        "allow_abstain": {
+          "const": true
+        },
+        "latency_budget_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "task_id",
+        "feature_schema_version",
+        "minimized_state",
+        "allowed_decisions",
+        "allow_abstain",
+        "latency_budget_ms"
+      ]
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "decision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "abstained": {
+          "type": "boolean"
+        },
+        "artifact_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adapter_kind": {
+          "enum": [
+            "RULE",
+            "TINY_CLASSIFIER",
+            "JEV_STYLE",
+            "OTHER_TYPED_DECISION"
+          ]
+        },
+        "raw_score": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "calibrated_correctness": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "calibration_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "feature_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "latency_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "usage": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "input_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "output_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            }
+          },
+          "required": [
+            "input_tokens",
+            "output_tokens"
+          ]
+        }
+      },
+      "required": [
+        "decision",
+        "abstained",
+        "artifact_version",
+        "adapter_kind",
+        "raw_score",
+        "calibrated_correctness",
+        "calibration_version",
+        "feature_refs",
+        "latency_ms",
+        "usage"
+      ]
+    }
+  }
+}

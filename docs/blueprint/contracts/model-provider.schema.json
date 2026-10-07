@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NOVA model provider abstraction",
+  "$defs": {
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_kind": {
+          "enum": [
+            "EXTRACT",
+            "EXPLAIN",
+            "PLAN",
+            "REASON",
+            "INDEPENDENT_REVIEW"
+          ]
+        },
+        "data_class": {
+          "enum": [
+            "PUBLIC",
+            "SYNTHETIC",
+            "PRIVATE_ALLOWED_LOCAL",
+            "PRIVATE_APPROVED_REMOTE"
+          ]
+        },
+        "evidence_handles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^h_[A-Za-z0-9_-]{1,80}$"
+          }
+        },
+        "output_schema_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "allowed_tool_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "max_input_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_output_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_cost_currency": {
+          "type": "string",
+          "minLength": 1
+        },
+        "max_cost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cancellation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy_version": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "task_id",
+        "task_kind",
+        "data_class",
+        "evidence_handles",
+        "output_schema_id",
+        "allowed_tool_ids",
+        "max_input_tokens",
+        "max_output_tokens",
+        "max_cost_currency",
+        "max_cost",
+        "timeout_ms",
+        "cancellation_id",
+        "policy_version"
+      ]
+    },
+    "response": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adapter_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "structured_output": {
+          "type": "object"
+        },
+        "proposed_tool_calls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "tool_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "arguments": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "tool_id",
+              "arguments"
+            ]
+          }
+        },
+        "finish_status": {
+          "enum": [
+            "COMPLETED",
+            "ABSTAINED",
+            "BUDGET_EXCEEDED",
+            "CANCELLED",
+            "ERROR"
+          ]
+        },
+        "usage": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "input_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "cached_input_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "output_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "reported_billable_units": {
+              "type": "object"
+            },
+            "observability": {
+              "enum": [
+                "OBSERVED",
+                "ESTIMATED",
+                "NOT_OBSERVABLE"
+              ]
+            }
+          },
+          "required": [
+            "input_tokens",
+            "cached_input_tokens",
+            "output_tokens",
+            "reported_billable_units",
+            "observability"
+          ]
+        },
+        "latency_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "safe_error_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "task_id",
+        "model_id",
+        "adapter_version",
+        "structured_output",
+        "proposed_tool_calls",
+        "finish_status",
+        "usage",
+        "latency_ms",
+        "safe_error_code"
+      ]
+    }
+  }
+}

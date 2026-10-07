@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NOVA proposed semantic tool contracts",
+  "$defs": {
+    "discovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {},
+      "required": []
+    },
+    "search": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "page_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "default": 20
+        },
+        "cursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "object": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "object_handle": {
+          "type": "string",
+          "pattern": "^h_[A-Za-z0-9_-]{1,80}$"
+        }
+      },
+      "required": [
+        "object_handle"
+      ]
+    },
+    "structure": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "object_handle": {
+          "type": "string",
+          "pattern": "^h_[A-Za-z0-9_-]{1,80}$"
+        },
+        "configuration_handle": {
+          "type": "string",
+          "pattern": "^h_[A-Za-z0-9_-]{1,80}$"
+        },
+        "max_depth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        }
+      },
+      "required": [
+        "object_handle",
+        "configuration_handle"
+      ]
+    },
+    "process_list": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "page_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "default": 20
+        },
+        "cursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": []
+    },
+    "start_process": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "process_handle": {
+          "type": "string",
+          "pattern": "^h_[A-Za-z0-9_-]{1,80}$"
+        },
+        "input_bundle_handle": {
+          "type": "string",
+          "pattern": "^h_[A-Za-z0-9_-]{1,80}$"
+        }
+      },
+      "required": [
+        "process_handle",
+        "input_bundle_handle"
+      ]
+    },
+    "complete_task": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "task_handle": {
+          "type": "string",
+          "pattern": "^h_[A-Za-z0-9_-]{1,80}$"
+        },
+        "input_bundle_handle": {
+          "type": "string",
+          "pattern": "^h_[A-Za-z0-9_-]{1,80}$"
+        }
+      },
+      "required": [
+        "task_handle",
+        "input_bundle_handle"
+      ]
+    },
+    "prepare_change": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target_handles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^h_[A-Za-z0-9_-]{1,80}$"
+          },
+          "minItems": 1,
+          "maxItems": 20
+        },
+        "proposal_handle": {
+          "type": "string",
+          "pattern": "^h_[A-Za-z0-9_-]{1,80}$"
+        }
+      },
+      "required": [
+        "target_handles",
+        "proposal_handle"
+      ]
+    },
+    "result_envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "OK",
+            "PARTIAL",
+            "NOT_FOUND",
+            "AUTHORIZATION_DENIED",
+            "UNSUPPORTED",
+            "INSUFFICIENT_EVIDENCE",
+            "ERROR"
+          ]
+        },
+        "evidence_handles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^h_[A-Za-z0-9_-]{1,80}$"
+          }
+        },
+        "coverage": {
+          "enum": [
+            "COMPLETE_WITHIN_DECLARED_SCOPE",
+            "PARTIAL",
+            "UNKNOWN",
+            "NOT_APPLICABLE"
+          ]
+        },
+        "next_cursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "trace_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "error_code": {
+          "enum": [
+            null,
+            "API_NOT_VERIFIED",
+            "AUTHENTICATION_REQUIRED",
+            "AUTHORIZATION_DENIED",
+            "RATE_LIMITED",
+            "INVALID_INPUT",
+            "CONTRACT_MISMATCH",
+            "BUDGET_EXCEEDED",
+            "UPSTREAM_UNAVAILABLE"
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "evidence_handles",
+        "coverage",
+        "next_cursor",
+        "trace_id",
+        "error_code"
+      ]
+    }
+  }
+}

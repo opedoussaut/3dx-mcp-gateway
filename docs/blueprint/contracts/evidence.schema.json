@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NOVA evidence record",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "handle": {
+      "type": "string",
+      "pattern": "^h_[A-Za-z0-9_-]{1,80}$"
+    },
+    "trust": {
+      "const": "UNTRUSTED_SOURCE_DATA"
+    },
+    "source_operation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "retrieved_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "revision": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "configuration_handle": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^h_[A-Za-z0-9_-]{1,80}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "unit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provenance_handle": {
+            "type": "string",
+            "pattern": "^h_[A-Za-z0-9_-]{1,80}$"
+          }
+        },
+        "required": [
+          "field",
+          "value",
+          "unit",
+          "provenance_handle"
+        ]
+      }
+    },
+    "coverage": {
+      "enum": [
+        "COMPLETE_WITHIN_DECLARED_SCOPE",
+        "PARTIAL",
+        "UNKNOWN"
+      ]
+    },
+    "data_class": {
+      "enum": [
+        "PUBLIC",
+        "SYNTHETIC",
+        "PRIVATE_ALLOWED_LOCAL",
+        "PRIVATE_APPROVED_REMOTE"
+      ]
+    },
+    "contradiction_handles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^h_[A-Za-z0-9_-]{1,80}$"
+      }
+    },
+    "missing_fields": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "required": [
+    "handle",
+    "trust",
+    "source_operation_id",
+    "retrieved_at",
+    "revision",
+    "configuration_handle",
+    "facts",
+    "coverage",
+    "data_class",
+    "contradiction_handles",
+    "missing_fields"
+  ]
+}

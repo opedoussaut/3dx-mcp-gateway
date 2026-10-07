@@ -1,0 +1,538 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NOVA API admission registry",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "research_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "live_operations_enabled": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "admission_policy": {
+      "const": "DENY_BY_DEFAULT"
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^T[0-9]{2}$"
+          },
+          "semantic_mcp_tool": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]+$"
+          },
+          "capability_group": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "LOCAL",
+              "PLATFORM",
+              "PLATFORM_DEPENDENT_PREPARE"
+            ]
+          },
+          "service": {
+            "type": "string",
+            "minLength": 1
+          },
+          "domain": {
+            "type": "string",
+            "minLength": 1
+          },
+          "api_version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "deployment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "verified_release": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "classification": {
+            "enum": [
+              "PUBLIC_SUPPORTED",
+              "PUBLIC_UNCLEAR",
+              "PRIVATE_OR_INTERNAL",
+              "UNKNOWN"
+            ]
+          },
+          "classification_scope": {
+            "enum": [
+              "LOCAL_NOT_APPLICABLE",
+              "PROPOSED_UPSTREAM_OPERATION"
+            ]
+          },
+          "implementation_status": {
+            "enum": [
+              "LOCAL_SPEC_READY",
+              "BLOCKED_PENDING_VERIFICATION",
+              "IMPLEMENTABLE"
+            ]
+          },
+          "enabled_by_default": {
+            "type": "boolean"
+          },
+          "operation": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "operation_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "http_method": {
+                "enum": [
+                  null,
+                  "GET",
+                  "POST",
+                  "PUT",
+                  "PATCH",
+                  "DELETE",
+                  "HEAD",
+                  "OPTIONS"
+                ]
+              },
+              "path": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "operation_id",
+              "http_method",
+              "path"
+            ]
+          },
+          "official_documentation_sources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "evidence_strength": {
+            "type": "string",
+            "minLength": 1
+          },
+          "authentication": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "profile": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "mechanism": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "verified": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "profile",
+              "mechanism",
+              "verified"
+            ]
+          },
+          "csrf_requirement": {
+            "enum": [
+              "UNKNOWN",
+              "REQUIRED",
+              "NOT_REQUIRED",
+              "NOT_APPLICABLE"
+            ]
+          },
+          "required_role": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required_license": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "security_context_requirement": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "upstream_input_schema": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "upstream_output_schema": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "proposed_semantic_input_schema_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "proposed_semantic_output_schema_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "read_write_classification": {
+            "type": "string",
+            "minLength": 1
+          },
+          "risk_level": {
+            "enum": [
+              "L0",
+              "L1",
+              "L2",
+              "L3",
+              "L4"
+            ]
+          },
+          "risk_level_provisional": {
+            "type": "boolean"
+          },
+          "idempotency": {
+            "type": "string",
+            "minLength": 1
+          },
+          "approval_requirement": {
+            "type": "string",
+            "minLength": 1
+          },
+          "verified_contract": {
+            "type": "boolean"
+          },
+          "runtime_verified": {
+            "type": "boolean"
+          },
+          "publication_reviewed": {
+            "type": "boolean"
+          },
+          "admission_blockers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "observed_operation_leads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "source_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "source_scope": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "http_method": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "observed_headers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "verified_public_contract": {
+                  "type": "boolean"
+                },
+                "executable": {
+                  "const": false
+                }
+              },
+              "required": [
+                "source_id",
+                "source_scope",
+                "http_method",
+                "path",
+                "observed_headers",
+                "verified_public_contract",
+                "executable"
+              ]
+            }
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "semantic_mcp_tool",
+          "capability_group",
+          "kind",
+          "service",
+          "domain",
+          "api_version",
+          "deployment",
+          "verified_release",
+          "classification",
+          "classification_scope",
+          "implementation_status",
+          "enabled_by_default",
+          "operation",
+          "official_documentation_sources",
+          "evidence_strength",
+          "authentication",
+          "csrf_requirement",
+          "required_role",
+          "required_license",
+          "security_context_requirement",
+          "upstream_input_schema",
+          "upstream_output_schema",
+          "proposed_semantic_input_schema_ref",
+          "proposed_semantic_output_schema_ref",
+          "read_write_classification",
+          "risk_level",
+          "risk_level_provisional",
+          "idempotency",
+          "approval_requirement",
+          "verified_contract",
+          "runtime_verified",
+          "publication_reviewed",
+          "admission_blockers",
+          "observed_operation_leads",
+          "notes"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "implementation_status": {
+                  "const": "IMPLEMENTABLE"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "classification": {
+                  "const": "PUBLIC_SUPPORTED"
+                },
+                "verified_contract": {
+                  "const": true
+                },
+                "verified_release": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "deployment": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "api_version": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "operation": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "operation_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "http_method": {
+                      "enum": [
+                        "GET",
+                        "POST",
+                        "PUT",
+                        "PATCH",
+                        "DELETE",
+                        "HEAD",
+                        "OPTIONS"
+                      ]
+                    },
+                    "path": {
+                      "type": "string",
+                      "pattern": "^/"
+                    }
+                  },
+                  "required": [
+                    "operation_id",
+                    "http_method",
+                    "path"
+                  ]
+                },
+                "authentication": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "profile": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "mechanism": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "verified": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "profile",
+                    "mechanism",
+                    "verified"
+                  ]
+                },
+                "csrf_requirement": {
+                  "enum": [
+                    "REQUIRED",
+                    "NOT_REQUIRED",
+                    "NOT_APPLICABLE"
+                  ]
+                },
+                "required_role": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required_license": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "security_context_requirement": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "upstream_input_schema": {
+                  "type": "object"
+                },
+                "upstream_output_schema": {
+                  "type": "object"
+                },
+                "official_documentation_sources": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1
+                },
+                "risk_level_provisional": {
+                  "const": false
+                },
+                "admission_blockers": {
+                  "type": "array",
+                  "maxItems": 0
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "enabled_by_default": {
+                  "const": true
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "implementation_status": {
+                  "const": "IMPLEMENTABLE"
+                },
+                "classification": {
+                  "const": "PUBLIC_SUPPORTED"
+                },
+                "runtime_verified": {
+                  "const": true
+                },
+                "publication_reviewed": {
+                  "const": true
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "classification": {
+                  "enum": [
+                    "PUBLIC_UNCLEAR",
+                    "PRIVATE_OR_INTERNAL",
+                    "UNKNOWN"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "enabled_by_default": {
+                  "const": false
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "research_date",
+    "live_operations_enabled",
+    "admission_policy",
+    "tools"
+  ]
+}

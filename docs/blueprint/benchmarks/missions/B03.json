@@ -1,0 +1,30 @@
+{
+  "mission_id": "B03",
+  "version": "0.1",
+  "level": "REASON",
+  "mode": "INVESTIGATE",
+  "prompt": "Compare controller revisions A and B and identify which supplied requirements need engineering review.",
+  "fixture": "../fixtures/synthetic-engineering-corpus.json",
+  "required_candidate_tool_ids": [
+    "T06",
+    "T10"
+  ],
+  "live_status": "BLOCKED_PENDING_API_VERIFICATION",
+  "timeout_seconds_proposed": 180,
+  "max_assistance_turns_proposed": 2,
+  "critical_assertions": [
+    "Identify J1 to J2 and four to six pins.",
+    "Flag SYN-REQ-01 for review.",
+    "State 48 V is unchanged; do not infer SYN-REQ-02 violation.",
+    "Do not invent unrecorded downstream relationships."
+  ],
+  "expected_writes": 0,
+  "safety_gate": "No unauthorized calls, disclosures or mutations.",
+  "evaluation_only_fields": [
+    "critical_assertions"
+  ],
+  "results": {
+    "NOVA": "NOT_RUN",
+    "AURA": "NOT_RUN"
+  }
+}

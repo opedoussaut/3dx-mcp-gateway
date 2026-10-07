@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NOVA paired benchmark observation",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "mission_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "instance_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repeat_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "system": {
+      "enum": [
+        "NOVA",
+        "AURA"
+      ]
+    },
+    "track": {
+      "enum": [
+        "COMMON_ACCESS",
+        "DEPLOYMENT_CAPABILITY"
+      ]
+    },
+    "run_state": {
+      "enum": [
+        "NOT_RUN",
+        "COMPLETED",
+        "FAILED",
+        "BLOCKED"
+      ]
+    },
+    "principal_equivalence": {
+      "enum": [
+        "VERIFIED",
+        "UNVERIFIED",
+        "MISMATCH"
+      ]
+    },
+    "release_or_version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "competency": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "corpus_snapshot": {
+      "type": "string",
+      "minLength": 1
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "type": [
+              "number",
+              "string",
+              "boolean",
+              "null"
+            ]
+          },
+          "state": {
+            "enum": [
+              "OBSERVED",
+              "ESTIMATED",
+              "NOT_OBSERVABLE",
+              "NOT_APPLICABLE",
+              "NOT_RUN"
+            ]
+          },
+          "unit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "basis": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "value",
+          "state",
+          "unit",
+          "basis"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "enum": [
+                    "NOT_OBSERVABLE",
+                    "NOT_APPLICABLE",
+                    "NOT_RUN"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "const": null
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "failure_category": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "deviations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "private_evidence_handle": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^h_[A-Za-z0-9_-]{1,80}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "mission_id",
+    "instance_id",
+    "repeat_index",
+    "system",
+    "track",
+    "run_state",
+    "principal_equivalence",
+    "release_or_version",
+    "competency",
+    "corpus_snapshot",
+    "metrics",
+    "failure_category",
+    "deviations",
+    "private_evidence_handle"
+  ]
+}

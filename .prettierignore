@@ -1,0 +1,6 @@
+package-lock.json
+docs/blueprint/
+docs/decisions/
+node_modules/
+dist/
+test-results/

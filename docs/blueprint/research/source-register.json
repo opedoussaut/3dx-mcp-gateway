@@ -1,0 +1,138 @@
+{
+  "review_date": "2026-10-05",
+  "sources": [
+    {
+      "id": "S01",
+      "description": "Dassault Systemes, Developer guides. Current portal listing and documentation entry points.",
+      "urls": [
+        "https://www.3ds.com/support/documentation/developer-guides"
+      ],
+      "accessed": "2026-10-05",
+      "content_status": "PUBLIC_TEXT_INSPECTED",
+      "evidence_class": "DEVELOPER_PORTAL"
+    },
+    {
+      "id": "S02",
+      "description": "Dassault Systemes, Cloud R2026x FD04 and FD03 Developer Assistance. Access check reached sign-in; contract contents not inspected.",
+      "urls": [
+        "https://media.3ds.com/support/documentation/developer/cloud/R2026x-FD04/en/DSDoc.htm?show=CAADocQuickRefs%2FDSDocHome.htm",
+        "https://media.3ds.com/support/documentation/developer/cloud/R2026x-FD03/en/DSDoc.htm?show=CAADocQuickRefs%2FDSDocHome.htm"
+      ],
+      "accessed": "2026-10-05",
+      "content_status": "ACCESS_BLOCKED_SIGN_IN",
+      "evidence_class": "VENDOR_INFORMATION"
+    },
+    {
+      "id": "S03",
+      "description": "Dassault Systemes, 3DEXPERIENCE Platform Openness.",
+      "urls": [
+        "https://www.3ds.com/3dexperience-platform/openness"
+      ],
+      "accessed": "2026-10-05",
+      "content_status": "PUBLIC_TEXT_INSPECTED",
+      "evidence_class": "VENDOR_INFORMATION"
+    },
+    {
+      "id": "S04",
+      "description": "ENOVIA User Community, 3DEXPERIENCE Web Services Postman Primer, 17 December 2020. Historical examples, not current contract verification.",
+      "urls": [
+        "https://3dswym.3dexperience.3ds.com/post/enovia-user-community/3dexperience-web-services-postman-primer_TGle4SV2RFOt9z8alqjtKw"
+      ],
+      "accessed": "2026-10-05",
+      "content_status": "PUBLIC_TEXT_INSPECTED",
+      "evidence_class": "PUBLIC_COMMUNITY_EXAMPLE_OR_ANNOUNCEMENT"
+    },
+    {
+      "id": "S05",
+      "description": "ENOVIA User Community, 3DEXPERIENCE RESTful Web Services Authentication Alternative, 8 July 2021. Historical PFI integration-agent description.",
+      "urls": [
+        "https://3dswym.3dexperience.3ds.com/post/enovia-user-community/3dexperience-restful-web-services-authentication-alternative_uizUNOc8Tcuh0Wj_pWm5og"
+      ],
+      "accessed": "2026-10-05",
+      "content_status": "PUBLIC_TEXT_INSPECTED",
+      "evidence_class": "PUBLIC_COMMUNITY_EXAMPLE_OR_ANNOUNCEMENT"
+    },
+    {
+      "id": "S06",
+      "description": "3DEXPERIENCE platform users community, New changes on 3DPassport Service url, 12 September 2022.",
+      "urls": [
+        "https://3dswym.3dexperience.3ds.com/post/3dexperience-platform-user-s-community/new-changes-on-3dpassport-service-url_y1tBP80iThGttF1sJTmDLQ"
+      ],
+      "accessed": "2026-10-05",
+      "content_status": "PUBLIC_TEXT_INSPECTED",
+      "evidence_class": "PUBLIC_COMMUNITY_EXAMPLE_OR_ANNOUNCEMENT"
+    },
+    {
+      "id": "S07",
+      "description": "DELMIA Process Engineering community, Get Variant Effectivity on Eng Item or Resource, 5 March 2026, 2026x GA example.",
+      "urls": [
+        "https://3dswym.3dexperience.3ds.com/wiki/delmia-process-engineering/get-variant-effectivity-on-eng-item-or-resource_HZQW4kyHTiyk9c0HC_jnRQ"
+      ],
+      "accessed": "2026-10-05",
+      "content_status": "PUBLIC_TEXT_INSPECTED",
+      "evidence_class": "PUBLIC_COMMUNITY_EXAMPLE_OR_ANNOUNCEMENT"
+    },
+    {
+      "id": "S08",
+      "description": "3DEXPERIENCE platform users community, Business Process Designer, 29 April 2025. Public API Gateway announcement only; linked internal documentation was not used.",
+      "urls": [
+        "https://3dswym.3dexperience.3ds.com/wiki/3dexperience-platform-user-s-community/business-process-designer_fu5BkDD5SJiXJh1RndAgjg"
+      ],
+      "accessed": "2026-10-05",
+      "content_status": "PUBLIC_TEXT_INSPECTED",
+      "evidence_class": "PUBLIC_COMMUNITY_EXAMPLE_OR_ANNOUNCEMENT"
+    },
+    {
+      "id": "S09",
+      "description": "Dassault Systemes, AI-Based Functionality Intended Purpose.",
+      "urls": [
+        "https://www.3ds.com/trust-center/trusted-ai/ai-intended-purpose"
+      ],
+      "accessed": "2026-10-05",
+      "content_status": "PUBLIC_TEXT_INSPECTED",
+      "evidence_class": "VENDOR_INFORMATION"
+    },
+    {
+      "id": "S10",
+      "description": "Dassault Systemes, AURA AI Virtual Companion. Vendor description and commercial consumption model.",
+      "urls": [
+        "https://www.3ds.com/products/3dexperience/aura"
+      ],
+      "accessed": "2026-10-05",
+      "content_status": "PUBLIC_TEXT_INSPECTED",
+      "evidence_class": "VENDOR_INFORMATION"
+    },
+    {
+      "id": "S11",
+      "description": "Model Context Protocol, specification and security guidance.",
+      "urls": [
+        "https://modelcontextprotocol.io/specification/2026-07-28",
+        "https://modelcontextprotocol.io/docs/2026-07-28/tutorials/security/security_best_practices"
+      ],
+      "accessed": "2026-10-05",
+      "content_status": "PUBLIC_TEXT_INSPECTED",
+      "evidence_class": "OFFICIAL_STANDARD_OR_PROJECT_DOCS"
+    },
+    {
+      "id": "S12",
+      "description": "Ollama, Nimble model documentation.",
+      "urls": [
+        "https://ollama.com/library/nimble"
+      ],
+      "accessed": "2026-10-05",
+      "content_status": "PUBLIC_TEXT_INSPECTED",
+      "evidence_class": "OFFICIAL_STANDARD_OR_PROJECT_DOCS"
+    },
+    {
+      "id": "S13",
+      "description": "Ollama, Ollama now supports Jev-style decision models, 29 September 2026.",
+      "urls": [
+        "https://registry.ollama.com/blog/ollama-now-supports-jev-style-decision-models"
+      ],
+      "accessed": "2026-10-05",
+      "content_status": "PUBLIC_TEXT_INSPECTED",
+      "evidence_class": "OFFICIAL_STANDARD_OR_PROJECT_DOCS"
+    }
+  ],
+  "no_vendor_documents_redistributed": true
+}

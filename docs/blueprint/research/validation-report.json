@@ -1,0 +1,24 @@
+{
+  "scope": "Specification consistency, not live integration or full JSON Schema metaschema validation",
+  "date": "2026-10-05",
+  "json_files_parsed": 16,
+  "candidate_tools": 20,
+  "local_utilities": 2,
+  "platform_candidates_blocked": 18,
+  "live_operations_enabled": 0,
+  "admission_negative_states_rejected": 4,
+  "semantic_refs_resolved": 40,
+  "mission_files": 5,
+  "adrs": 10,
+  "synthetic_golden_arithmetic": "PASS",
+  "source_reference_integrity": "PASS",
+  "bounded_publication_scan": "PASS",
+  "runtime_tests": "NOT_RUN",
+  "aura_benchmark": "NOT_RUN",
+  "full_json_schema_validator": "NOT_AVAILABLE_IN_RUNTIME",
+  "document_qa": {
+    "pages": 14,
+    "rendered_and_visually_reviewed": true,
+    "docx_archive_integrity": "PASS"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "release": "REPLACE_WITH_VERIFIED_RELEASE",
+  "authenticationVerified": false,
+  "authMode": "bearer",
+  "reviewedBy": "",
+  "verifiedAt": "",
+  "operations": {},
+  "templateNote": "INTENTIONALLY BLOCKED. Remove this note and fill only verified contracts using docs/CONNECTING.md. No 3DEXPERIENCE endpoint is supplied or implied."
+}

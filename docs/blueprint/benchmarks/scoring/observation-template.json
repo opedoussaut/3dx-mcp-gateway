@@ -1,0 +1,41 @@
+{
+  "mission_id": "B01",
+  "instance_id": "SYN-B01-001",
+  "repeat_index": 0,
+  "system": "AURA",
+  "track": "COMMON_ACCESS",
+  "run_state": "NOT_RUN",
+  "principal_equivalence": "UNVERIFIED",
+  "release_or_version": null,
+  "competency": null,
+  "corpus_snapshot": "synthetic-engineering-corpus-0.1",
+  "metrics": {
+    "task_success": {
+      "value": null,
+      "state": "NOT_RUN",
+      "unit": null,
+      "basis": null
+    },
+    "wall_time": {
+      "value": null,
+      "state": "NOT_RUN",
+      "unit": "seconds",
+      "basis": null
+    },
+    "input_tokens": {
+      "value": null,
+      "state": "NOT_OBSERVABLE",
+      "unit": "tokens",
+      "basis": "No supported observation source verified."
+    },
+    "model_cost": {
+      "value": null,
+      "state": "NOT_OBSERVABLE",
+      "unit": null,
+      "basis": "No billing observation verified."
+    }
+  },
+  "failure_category": null,
+  "deviations": [],
+  "private_evidence_handle": null
+}
