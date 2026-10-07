@@ -387,3 +387,14 @@ test('a live mission over an admitted contract is labelled live and reports unkn
   assert.equal(unbound.status, 'blocked');
   assert.match(unbound.answer, /no reviewed contract/);
 });
+test('checked-in application contract templates intentionally fail admission', async () => {
+  const { readFileSync } = await import('node:fs');
+  for (const [app, file] of [
+    ['ITEROP', 'config/iterop-contract.template.json'],
+    ['DATASET_CATALOG', 'config/catalog-contract.template.json'],
+  ] as const)
+    assert.equal(
+      appContractSchema(app).safeParse(JSON.parse(readFileSync(file, 'utf8'))).success,
+      false,
+    );
+});

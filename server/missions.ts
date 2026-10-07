@@ -171,7 +171,7 @@ export class MissionRunner {
       return stop(
         'needs_input',
         'Switch to Act to prepare a draft',
-        'Act creates a local review draft for you to inspect. It does not submit anything to 3DEXPERIENCE.',
+        'Act creates a local review draft for you to inspect. It does not submit anything to your platform.',
       );
     const call = async (
       name: ToolName,

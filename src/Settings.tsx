@@ -17,7 +17,7 @@ import {
   ShieldCheck,
   Unplug,
 } from 'lucide-react';
-import type { RuntimeStatus, Source } from '../shared/types';
+import type { AppDomain, AppStatus, RuntimeStatus, Source } from '../shared/types';
 import { api } from './api';
 import { CopyButton, ErrorNote, Pill, Spinner } from './ui';
 
@@ -82,12 +82,22 @@ export function Connections({
             <Unplug size={14} /> CONNECT YOUR WORK
           </div>
           <h1>Your platform. Your boundary.</h1>
-          <p>Connect NOVA to a private 3DEXPERIENCE runtime when its API contracts are ready.</p>
+          <p>
+            Each source connects independently — its own origin, credential, reviewed contract and
+            permissions. Nothing live runs until an approved contract is installed.
+          </p>
         </div>
         <button className="button secondary" onClick={() => void refresh()}>
           <RefreshCw size={15} /> Refresh status
         </button>
       </div>
+      <section className="app-connections" aria-label="Application connections">
+        {status?.apps &&
+          (['ITEROP', 'DATASET_CATALOG'] as AppDomain[]).map((app) => (
+            <AppConnection key={app} status={status.apps[app]} />
+          ))}
+      </section>
+      <h2 className="section-kicker">Engineering items</h2>
       <div className="connection-options">
         <button
           className={`connection-option ${source === 'synthetic' ? 'selected' : ''}`}
@@ -115,7 +125,7 @@ export function Connections({
             </span>
             <span className="radio-indicator">{source === 'live' && <Check size={12} />}</span>
           </div>
-          <h2>My 3DEXPERIENCE</h2>
+          <h2>Engineering platform</h2>
           <p>
             Your tenant, your permissions, and only the public read operations you have verified.
           </p>
@@ -387,5 +397,84 @@ export function Registry() {
         </p>
       </div>
     </div>
+  );
+}
+
+const serviceName: Record<AppDomain, string> = {
+  ITEROP: 'Operator diagnostic · ITEROP business process service',
+  DATASET_CATALOG: 'Operator diagnostic · dataset catalog service',
+};
+function AppConnection({ status }: { status: AppStatus }) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const test = async () => {
+    setBusy(true);
+    setMessage('');
+    setError('');
+    try {
+      setMessage((await api<{ message: string }>(`/apps/${status.app}/test`, {})).message);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const checks = [
+    ['Service origin', status.configured],
+    ['Approved credential', status.credentialsPresent],
+    ['Reviewed contract', status.contractValid],
+  ] as const;
+  return (
+    <article className="app-connection" aria-label={`${status.label} connection`}>
+      <header>
+        <div>
+          <h2>{status.label}</h2>
+          <small>{serviceName[status.app]}</small>
+        </div>
+        <Pill tone={status.liveReady ? 'green' : 'amber'}>
+          {status.liveReady ? 'Live read admitted' : 'Live access blocked'}
+        </Pill>
+      </header>
+      <ul className="app-checks">
+        {checks.map(([label, done]) => (
+          <li key={label} className={done ? 'done' : ''}>
+            {done ? <CheckCircle2 size={15} /> : <Circle size={15} />} {label}
+          </li>
+        ))}
+      </ul>
+      <p className="app-finding">{status.accessFinding}</p>
+      <details className="app-ops">
+        <summary>
+          {status.candidateOperations.length} candidate read operations ·{' '}
+          {status.allowedOperations.length} admitted
+        </summary>
+        <ul>
+          {status.candidateOperations.map((o) => (
+            <li key={o.name}>
+              <code>{o.name}</code>
+              <span>{o.description}</span>
+              <Pill tone={o.status === 'ADMITTED' ? 'green' : 'neutral'}>{o.status}</Pill>
+            </li>
+          ))}
+        </ul>
+      </details>
+      <div className="connection-test">
+        <button
+          className="button secondary"
+          disabled={busy || !status.liveReady}
+          onClick={() => void test()}
+        >
+          {busy ? <Spinner /> : <PlugZap size={16} />} Test {status.label} read
+        </button>
+        <p>Runs the contract's single probe read. Disabled until the contract is admitted.</p>
+      </div>
+      {message && (
+        <div className="success-note" role="status">
+          <CheckCircle2 size={16} /> {message}
+        </div>
+      )}
+      {error && <ErrorNote message={error} />}
+    </article>
   );
 }

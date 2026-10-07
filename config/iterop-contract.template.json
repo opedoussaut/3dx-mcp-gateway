@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "app": "ITEROP",
+  "release": "REPLACE_WITH_VERIFIED_RELEASE",
+  "apiVersion": "REPLACE_WITH_DOCUMENTED_API_VERSION",
+  "authenticationVerified": false,
+  "authMode": "basic",
+  "securityContext": "NOT_REQUIRED",
+  "reviewedBy": "",
+  "verifiedAt": "",
+  "probe": { "operation": "iterop.list_my_tasks" },
+  "operations": {},
+  "templateNote": "INTENTIONALLY BLOCKED. Fill only from reviewed, release-specific official documentation and an approved credential (docs/CONNECTING-APPS.md). No ITEROP endpoint path is supplied or implied."
+}

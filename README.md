@@ -1,10 +1,12 @@
 # NOVA · Engineering workspace
 
-A natural-language workspace for engineering missions on 3DEXPERIENCE, with a governed semantic MCP gateway and an AURA observation lab.
+A natural-language engineering workspace with governed read connectors for **Business Process (ITEROP)**, **Datasets Governance (data catalog)** and engineering items, a semantic MCP gateway, and an AURA observation lab (deferred).
 
 **Claude project handover:** Read [CLAUDE.md](CLAUDE.md) for implementation ownership and [the full handover](docs/CLAUDE-HANDOVER.md) for the verified baseline, architecture, setup, limitations, and continuation backlog.
 
-![NOVA mission control](docs/screenshots/workspace.png)
+![NOVA Business Process workspace — synthetic](docs/screenshots/business-process-desktop.png)
+
+**NOVA-003 status:** Business Process and Datasets Governance work end to end on **synthetic** data: natural-language questions, a canvas, a copilot with cited evidence, and denial and insufficient-evidence states. **The first live reads in both apps are blocked on approved access and documented contracts.** See [the access map and exact requirements](docs/CONNECTING-APPS.md).
 
 **This repository contains a runnable application.** It starts with a synthetic engineering corpus and needs no platform credentials or model subscription. Live platform reads require private configuration and reviewed API contracts for the target release. No real tenant connection or AURA evaluation has been performed by this project.
 
@@ -19,7 +21,7 @@ npm ci
 npm run dev
 ```
 
-Open **http://127.0.0.1:3000**. Select a guided mission and press the arrow to run it. The source selector explicitly distinguishes **Synthetic workspace** from **My 3DEXPERIENCE**.
+Open **http://127.0.0.1:3000**. The workspace opens on **Business Process**. Pick a question under _Ask about_, select an object on the canvas, and ask a follow-up. Each application has its own **Synthetic / Live** selector and its own connection health.
 
 For the optimized application:
 
@@ -32,19 +34,25 @@ The server binds to loopback. This is a private, single-operator application; th
 
 ## What works
 
-| Area                 | Implemented behavior                                                                                                                                                  |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Mission control      | Natural-language input, Ask / Investigate / Act modes, five guided missions, session history, evidence inspection, execution traces and JSON export                   |
-| Engineering missions | Revision eligibility under the supplied synthetic policy, configured occurrence counting, revision comparison, qualification evidence review and local review drafts  |
-| Connection readiness | Server-side configuration checks, release-specific contract validation and a one-read identity check when a reviewed binding is installed                             |
-| Read gateway         | Fixed tenant origin, named semantic tools, GET-only private bindings, bounded responses, field projection, explicit coverage, permission-denial stop and no redirects |
-| MCP                  | A stdio server with two local utilities and six synthetic read adapters; live tools are exposed only when their private bindings are admitted                         |
-| AURA comparison      | Exact prompt copying, shared synthetic context pack, manual answer/time/citation capture, optional human scores, context declaration and observation export           |
-| Intelligence routing | Deterministic routing first; an optional local Ollama classifier for otherwise unrecognized intents, with explicit prompt-egress permission                           |
+| Area                 | Implemented behavior                                                                                                                                                                      |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Business Process     | Startable processes, my tasks (due date or priority), process status, remaining steps and approvals, why a task needs attention, and local start/complete drafts that are never submitted |
+| Datasets Governance  | Topic search, owner and description, related resources, lineage, freshness and classification, and metadata-based suitability with explicit gaps. No content download                     |
+| Mission control      | Natural-language input, Ask / Investigate / Act modes, five guided missions, session history, evidence inspection, execution traces and JSON export                                       |
+| Engineering missions | Revision eligibility under the supplied synthetic policy, configured occurrence counting, revision comparison, qualification evidence review and local review drafts                      |
+| Connection readiness | Server-side configuration checks, release-specific contract validation and a one-read identity check when a reviewed binding is installed                                                 |
+| Read gateway         | Fixed tenant origin, named semantic tools, GET-only private bindings, bounded responses, field projection, explicit coverage, permission-denial stop and no redirects                     |
+| MCP                  | A stdio server with two local utilities and six synthetic read adapters; live tools are exposed only when their private bindings are admitted                                             |
+| AURA comparison      | Exact prompt copying, shared synthetic context pack, manual answer/time/citation capture, optional human scores, context declaration and observation export                               |
+| Intelligence routing | Deterministic routing first; an optional local Ollama classifier for otherwise unrecognized intents, with explicit prompt-egress permission                                               |
 
 Known missions are solved by ordinary code over retrieved records. This version is not a general-purpose conversational model or a completed multi-agent implementation. The provider interface is designed for extensions; only the optional Ollama adapter is implemented, and a real model inference run has not been validated here.
 
 ## Connect your platform
+
+**Business Process and Datasets Governance:** see [CONNECTING-APPS.md](docs/CONNECTING-APPS.md). Each has its own `NOVA_ITEROP_*` / `NOVA_CATALOG_*` configuration and its own reviewed contract.
+
+**Engineering items:**
 
 Follow [the private connection guide](docs/CONNECTING.md). Configure the origin, release, security context, authentication and a reviewed binding file on your machine. The interface deliberately does not collect credentials.
 
@@ -98,8 +106,9 @@ Tests cover synthetic mission outcomes, missing/ambiguous evidence, untrusted so
 ```text
 src/                 React interface
 server/              Local HTTP runtime, semantic gateway, mission runner, MCP server
+server/apps/         Independent ITEROP and dataset-catalog connectors, registry and NL router
 shared/              Typed mission and observation contracts; benchmark prompts
-config/              Deliberately blocked private-contract template
+config/              Deliberately blocked private-contract templates (engineering, ITEROP, catalog)
 tests/               Runtime, HTTP, MCP and browser tests
 docs/CONNECTING.md   Private runtime setup and limitations
 docs/blueprint/      Technical blueprint, registry, schemas and synthetic fixtures

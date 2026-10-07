@@ -9,7 +9,7 @@ import {
   ChevronDown,
   ChevronRight,
   CircleHelp,
-  Command,
+  Database,
   FlaskConical,
   GitCompareArrows,
   Layers3,
@@ -20,17 +20,27 @@ import {
   Settings2,
   ShieldCheck,
   Unplug,
+  Workflow,
   X,
 } from 'lucide-react';
-import type { Benchmark, Mission, Mode, RuntimeStatus, Source } from '../shared/types';
+import type { AppDomain, Benchmark, Mission, Mode, RuntimeStatus, Source } from '../shared/types';
 import { benchmarks } from '../shared/benchmarks';
 import { api } from './api';
 import { ErrorNote, EvidenceCard, NovaMark, Pill, Result, Spinner } from './ui';
 import { CompareView } from './Compare';
 import { Connections, Registry } from './Settings';
+import { AppWorkspace } from './AppWorkspace';
 
-type View = 'missions' | 'compare' | 'connections' | 'registry';
+type View = 'process' | 'catalog' | 'missions' | 'compare' | 'connections' | 'registry';
+const viewDomain = { process: 'ITEROP', catalog: 'DATASET_CATALOG' } as const;
+const domainView = {
+  ITEROP: 'process',
+  DATASET_CATALOG: 'catalog',
+  ENGINEERING: 'missions',
+} as const;
 const nav = [
+  { id: 'process', label: 'Business Process', icon: Workflow },
+  { id: 'catalog', label: 'Datasets Governance', icon: Database },
   { id: 'missions', label: 'Mission control', icon: MessageSquare },
   { id: 'compare', label: 'AURA comparison', icon: GitCompareArrows },
   { id: 'connections', label: 'Connections', icon: Unplug },
@@ -38,13 +48,23 @@ const nav = [
 ] as const;
 const icons = [Search, Box, GitCompareArrows, BookOpen, ShieldCheck];
 const viewNames: Record<View, string> = {
+  process: 'Business Process',
+  catalog: 'Datasets Governance',
   missions: 'Mission control',
   compare: 'AURA comparison',
   connections: 'Connections',
   registry: 'Tool registry',
 };
 export default function App() {
-  const [view, setView] = useState<View>('missions');
+  const [view, setView] = useState<View>('process');
+  const [appSource, setAppSource] = useState<Record<AppDomain, Source>>({
+    ITEROP: 'synthetic',
+    DATASET_CATALOG: 'synthetic',
+  });
+  const [appActive, setAppActive] = useState<Record<AppDomain, Mission | null>>({
+    ITEROP: null,
+    DATASET_CATALOG: null,
+  });
   const [status, setStatus] = useState<RuntimeStatus | null>(null);
   const [source, setSource] = useState<Source>('synthetic');
   const [mode, setMode] = useState<Mode>('ASK');
@@ -113,8 +133,10 @@ export default function App() {
     const handle = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        setView('missions');
-        inputRef.current?.focus();
+        if (view !== 'process' && view !== 'catalog') {
+          setView('missions');
+          inputRef.current?.focus();
+        }
       }
       if (e.key === 'Escape') {
         setHelp(false);
@@ -123,7 +145,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handle);
     return () => window.removeEventListener('keydown', handle);
-  }, []);
+  }, [view]);
   const navigate = (next: View) => {
     setView(next);
     setMenuOpen(false);
@@ -157,6 +179,9 @@ export default function App() {
     setMode(b.mode);
     inputRef.current?.focus();
   };
+  const currentDomain = view === 'process' || view === 'catalog' ? viewDomain[view] : null;
+  const currentSource = currentDomain ? appSource[currentDomain] : source;
+  const currentReady = currentDomain ? status?.apps?.[currentDomain]?.liveReady : status?.liveReady;
   return (
     <div className="app-shell">
       {menuOpen && (
@@ -177,7 +202,7 @@ export default function App() {
         >
           <NovaMark />
           <span>
-            NOVA<small>ENGINEERING COMPANION</small>
+            NOVA<small>ENGINEERING INTELLIGENCE</small>
           </span>
         </a>
         <button
@@ -214,8 +239,22 @@ export default function App() {
             history.slice(0, 6).map((m) => (
               <button
                 key={m.id}
-                className={active?.id === m.id && view === 'missions' ? 'selected' : ''}
+                className={
+                  (
+                    m.domain === 'ENGINEERING' || !m.domain
+                      ? active?.id === m.id && view === 'missions'
+                      : appActive[m.domain]?.id === m.id && view === domainView[m.domain]
+                  )
+                    ? 'selected'
+                    : ''
+                }
                 onClick={() => {
+                  if (m.domain && m.domain !== 'ENGINEERING') {
+                    setAppActive((a) => ({ ...a, [m.domain]: m }));
+                    setAppSource((s) => ({ ...s, [m.domain]: m.source }));
+                    navigate(domainView[m.domain]);
+                    return;
+                  }
                   setActive(m);
                   setSource(m.source);
                   navigate('missions');
@@ -266,17 +305,31 @@ export default function App() {
               <ShieldCheck size={14} /> Private by design
             </span>
             <button className="environment-badge" onClick={() => navigate('connections')}>
-              <span className={`status-dot ${source === 'live' ? 'amber' : ''}`} />
-              {source === 'synthetic'
+              <span className={`status-dot ${currentSource === 'live' ? 'amber' : ''}`} />
+              {currentSource === 'synthetic'
                 ? 'Synthetic workspace'
-                : status?.liveReady
-                  ? 'Platform configured'
-                  : 'Platform setup needed'}
+                : currentReady
+                  ? 'Live source configured'
+                  : 'Live setup needed'}
               <ChevronDown size={12} />
             </button>
           </div>
         </header>
-        <main id="main-content">
+        <main id="main-content" className={currentDomain ? 'main-gen7' : ''}>
+          {currentDomain && (
+            <AppWorkspace
+              key={currentDomain}
+              domain={currentDomain}
+              status={status}
+              source={appSource[currentDomain]}
+              setSource={(s) => setAppSource((v) => ({ ...v, [currentDomain]: s }))}
+              active={appActive[currentDomain]}
+              setActive={(m) => setAppActive((v) => ({ ...v, [currentDomain]: m }))}
+              history={history}
+              onMission={addMission}
+              openConnections={() => navigate('connections')}
+            />
+          )}
           {view === 'missions' && (
             <div className={`mission-layout ${active ? 'has-result' : ''}`}>
               <section className="mission-main">
@@ -397,7 +450,7 @@ export default function App() {
                           onChange={(e) => setSource(e.target.value as Source)}
                         >
                           <option value="synthetic">Synthetic workspace</option>
-                          <option value="live">My 3DEXPERIENCE</option>
+                          <option value="live">My engineering platform</option>
                         </select>
                       </label>
                     </div>
@@ -565,6 +618,7 @@ export default function App() {
                   await api('/session/clear', {});
                   setHistory([]);
                   setActive(null);
+                  setAppActive({ ITEROP: null, DATASET_CATALOG: null });
                   setHelp(false);
                 } catch (e) {
                   setError((e as Error).message);

@@ -10,6 +10,8 @@ async function navigate(page: Page, name: string) {
 }
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Business Process', level: 1 })).toBeVisible();
+  await navigate(page, 'Mission control');
   await expect(
     page.getByRole('heading', { name: 'From a question to a clear next step.' }),
   ).toBeVisible();

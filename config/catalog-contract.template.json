@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "app": "DATASET_CATALOG",
+  "release": "REPLACE_WITH_VERIFIED_RELEASE",
+  "apiVersion": "REPLACE_WITH_DOCUMENTED_API_VERSION",
+  "authenticationVerified": false,
+  "authMode": "bearer",
+  "securityContext": "REQUIRED",
+  "reviewedBy": "",
+  "verifiedAt": "",
+  "probe": { "operation": "catalog.search_datasets", "query": "REPLACE_WITH_NON_SENSITIVE_TOPIC" },
+  "operations": {},
+  "templateNote": "INTENTIONALLY BLOCKED. No official external Datasets Governance REST API has been confirmed. Fill only from reviewed official documentation (docs/CONNECTING-APPS.md)."
+}

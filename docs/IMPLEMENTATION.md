@@ -2,6 +2,16 @@
 
 The v0.1 blueprint remains the architecture target. This implementation turns its first read-only slice into a runnable local application; it does not claim all blueprint components are complete.
 
+## NOVA-003 additions (7 October 2026)
+
+- Independent application connectors in `server/apps/`: **ITEROP** (Business Process) and **DATASET_CATALOG** (Datasets Governance). Each has its own origin, credential, release-scoped contract schema, operation registry, field allowlist and connection test. Neither shares anything with the engineering gateway or with the other.
+- A deterministic EN/FR natural-language router per domain. The operator selects the domain in the UI; prompt text cannot change the domain, origin or credential.
+- Synthetic, principal-scoped adapters, including denial and not-found cases. 11 representative questions across the two apps, plus refusal of write and extraction requests.
+- Process start and task completion are only _prepared_ as local drafts (`PREPARED — NOT SUBMITTED`).
+- MCP: 9 additional read tools (`iterop_*`, `catalog_*`). They are synthetic by default; in live mode only admitted operations are exposed.
+- GEN7 workspace UI for both apps: context rail, canvas (task agenda, process timeline, catalog cards, lineage and relationship maps), and a NOVA Intelligence sidecar with mode, source, evidence and trace. Selection on the canvas drives contextual follow-up questions. The shell was rethemed from orange to industrial blue, with the Inter font bundled locally.
+- **Live reads in both apps: `BLOCKED`** on access and contracts. See `docs/CONNECTING-APPS.md`.
+
 ## Implemented
 
 - React/Vite interface with mission control, evidence inspection, history, connection readiness, registry and AURA observations.
