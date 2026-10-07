@@ -13,13 +13,15 @@ Olivier remains the project owner and sets priorities. Make routine engineering 
 
 Repository: <https://github.com/opedoussaut/3dx-mcp-gateway>
 
-## P0 — connection priority: ITEROP + Datasets Governance BEFORE AURA
+## P0 — ITEROP Business Process Play FIRST
 
-**Olivier explicitly reprioritized NOVA-003:** the first real natural-language integrations must target **ITEROP (Business Process)** and **Datasets Governance (NETVIBES catalog)**, **before** benchmark comparisons to AURA. Preserve the existing AURA screen and test coverage but defer additional AURA work until one useful authorized LIVE read has been demonstrated in each target app, or Olivier changes priorities.
+**Olivier changed the execution priority again.** First deliver natural-language access to **ITEROP Business Process Play**. Dataset Governance is postponed to a subsequent integration milestone, and **AURA benchmarking remains deferred** until real app utility is demonstrated. Do not delete their existing screens or tests.
 
-**Read and execute `docs/missions/NOVA-003-ITEROP-DATASET-GOVERNANCE-FIRST.md`.** Its initial domain operations are proposed *semantic* functions, not verified HTTP API contracts. Research approved documented operations independently for ITEROP and catalog services. Their authentication, entitlement and origins must not be conflated with engineering-item 3DSpace access. The ITEROP API Gateway route may require PFI (which Olivier says he lacks); no external Datasets Governance catalog API has been confirmed yet. Do not bypass access controls. Work on functional synthetic vertical slices and beautiful NOVA interface while obtaining documented and corporate-approved tenant access via an authorized channel.
+**Important new facts:** Olivier can access **ITEROP Play only**, not ITEROP Design or Admin. He also supplied a public-accessible OpenAPI specification for Business Process API 2.0.0; it documents GET methods for startable processes, current tasks and process metadata, but **it does not authorize access to his corporate tenant**. There is no confirmed service-account API credential or PFI entitlement. Do not confuse logged-in Play UI/SSO with REST access or attempt to bypass the entitlement.
 
-No unauthorized corporate uploads, external AI egress, process mutations, dataset downloads or secret disclosure. Work in the existing gateway repo. Build app-specific read-only adapters first, request human approval for any future process start/task completion.
+**Read and execute `docs/missions/NOVA-003-ITEROP-FIRST.md`** and **use the project skill `/nova-iterop`** for all ITEROP integration, workflow or task-related work. For interface changes also use `/nova-gen7-design`. The earlier dual-app plan `docs/missions/NOVA-003-ITEROP-DATASET-GOVERNANCE-FIRST.md` is superseded on sequencing only; retain it for later Dataset Governance work.
+
+**Do not stop at a plan.** Implement a tested, read-only **synthetic** ITEROP vertical slice while establishing, with the platform owner, which API/role/credential route is sanctioned. Do not upload corporate process details, live tenant responses, or credentials to public GitHub or unauthorized AI services; no process starting/completing without a separate approval and authorization path.
 
 ## P0 user experience direction — future GEN7 engineering workspace
 

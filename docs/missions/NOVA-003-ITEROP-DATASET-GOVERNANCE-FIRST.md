@@ -1,4 +1,6 @@
 # NOVA-003 — Connect ITEROP and Datasets Governance before AURA
+
+> **SUPERSEDED SEQUENCING (7 October 2026):** Olivier has narrowed immediate delivery to **ITEROP Business Process Play only**. The canonical current priority and contract is [`NOVA-003-ITEROP-FIRST.md`](NOVA-003-ITEROP-FIRST.md). Dataset Governance remains a later separate integration; AURA benchmarking remains deferred. This document is historical planning context, not a simultaneous execution instruction.
 **Commissioned by:** Olivier · **Date:** 7 October 2026 · **Priority:** P0 — immediately ahead of AURA benchmarking
 **Implementation repo:** `opedoussaut/3dx-mcp-gateway` · **Mission HQ:** `opedoussaut/nova-hq`
 **Status:** product direction approved, connectivity / endpoint contracts / credentials NOT verified.
