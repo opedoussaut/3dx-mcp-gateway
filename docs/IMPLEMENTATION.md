@@ -2,6 +2,29 @@
 
 The v0.1 blueprint remains the architecture target. This implementation turns its first read-only slice into a runnable local application; it does not claim all blueprint components are complete.
 
+## NOVA-003 — ITEROP first (7 October 2026)
+
+- `server/iterop/`: a dedicated ITEROP connector with its own origin, credential, contract and probe. Its operation inventory holds the three R2026x-FD04 P0 operations: `getAllStartableProcesses`, `getTasksByUser` and `getBasicProcessInfo`. A contract can bind only those operationIds; paths come from the inventory.
+- Deterministic English/French routing for: startable processes; current, overdue and next tasks; process summary (with name resolution against your startable list); and task attention. Cross-user requests and all writes are refused before any call.
+- Every upstream attempt carries provenance: operationId, documented call, spec release, source, scope, outcome, coverage and time.
+- MCP exposes `iterop_*` read tools: synthetic by default, and only admitted operations in live mode.
+- GEN7 Business Process workspace:
+  - processes and tasks rail;
+  - a canvas for the business object (task timeline, process context);
+  - the NOVA Intelligence sidecar;
+  - provenance, evidence and trace tabs.
+
+  The shell is rethemed to industrial blue, and the Inter font is bundled locally.
+
+- Visual polish:
+  - the selected process or task is shown as the canvas hero, with a stage flow, "You are here" and a context band. The flow is a SYNTHETIC illustration (`/api/iterop/flows`), and is unavailable in live mode until `getProcessInfo` is reviewed;
+  - business language in the primary UI; identifiers stay in Provenance, Evidence and Trace;
+  - Live is an explicit gate: no request is made and nothing falls back to synthetic data;
+  - mobile uses a My tasks | Processes switch and stacked provenance cards;
+  - AURA and the Tool registry sit under a secondary "Later" navigation group.
+- **LIVE: `BLOCKED`.** The FD04 schemas are pending (the file could not be retrieved), and no approved route or credential exists. See `docs/CONNECTING-ITEROP.md`.
+- Dataset Governance work is parked on the branch `claude/dataset-governance-parked`.
+
 ## Implemented
 
 - React/Vite interface with mission control, evidence inspection, history, connection readiness, registry and AURA observations.

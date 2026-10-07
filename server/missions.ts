@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type {
+  Domain,
   Evidence,
   Intent,
   Item,
@@ -11,18 +12,31 @@ import type {
 } from '../shared/types';
 import { Gateway, GatewayError, evidence } from './gateway';
 import { deterministicRoute, OllamaProvider, type ModelProvider } from './provider';
+import { IteropConnector } from './iterop/connector';
+import { loadIteropConfig } from './iterop/config';
+import { runIteropMission } from './iterop/missions';
 
 export class MissionRunner {
+  private iterop: IteropConnector;
   constructor(
     private gateway: Gateway,
     private provider?: ModelProvider,
-  ) {}
-  async run(prompt: string, source: Source, mode: Mode): Promise<Mission> {
+    iterop?: IteropConnector,
+  ) {
+    this.iterop = iterop || new IteropConnector(loadIteropConfig({}));
+  }
+  async run(
+    prompt: string,
+    source: Source,
+    mode: Mode,
+    domain: Domain = 'ENGINEERING',
+  ): Promise<Mission> {
     const start = performance.now();
     const mission: Mission = {
       id: randomUUID(),
       prompt,
       source,
+      domain,
       mode,
       intent: 'unknown',
       status: 'completed',
@@ -65,6 +79,23 @@ export class MissionRunner {
         : 'Only admitted public read operations. No platform mutations.',
       'policy',
     );
+    if (domain !== 'ENGINEERING') {
+      trace(
+        'Application scope',
+        `${domain} selected by the operator. Its origin, credential and contract are independent.`,
+        'policy',
+      );
+      return runIteropMission({
+        mission,
+        connector: this.iterop,
+        source,
+        mode,
+        prompt,
+        trace,
+        stop,
+        finish,
+      });
+    }
     const actionable = prompt
       .toLowerCase()
       .replace(
@@ -135,7 +166,7 @@ export class MissionRunner {
       return stop(
         'needs_input',
         'Switch to Act to prepare a draft',
-        'Act creates a local review draft for you to inspect. It does not submit anything to 3DEXPERIENCE.',
+        'Act creates a local review draft for you to inspect. It does not submit anything to your platform.',
       );
     const call = async (
       name: ToolName,

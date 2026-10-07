@@ -148,7 +148,7 @@ export function CompareView({
                   onChange={(e) => setSource(e.target.value as Source)}
                 >
                   <option value="synthetic">Synthetic workspace</option>
-                  <option value="live">My 3DEXPERIENCE</option>
+                  <option value="live">My engineering platform</option>
                 </select>
               </label>
               <CopyButton text={benchmark.prompt} />

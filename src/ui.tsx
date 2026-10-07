@@ -1,6 +1,6 @@
 import { Check, Copy, Download, FileText, LoaderCircle, ShieldCheck, Sparkles } from 'lucide-react';
 import { useState } from 'react';
-import type { Evidence, Mission } from '../shared/types';
+import type { Evidence, Mission, Source } from '../shared/types';
 import { downloadJson, duration } from './api';
 
 export function NovaMark({ small = false }: { small?: boolean }) {
@@ -15,10 +15,37 @@ export function Pill({
   tone = 'neutral',
 }: {
   children: React.ReactNode;
-  tone?: 'neutral' | 'green' | 'orange';
+  tone?: 'neutral' | 'green' | 'orange' | 'amber' | 'red';
 }) {
   return <span className={`pill ${tone}`}>{children}</span>;
 }
+export function SourceTag({ source }: { source: Source }) {
+  return (
+    <span
+      className={`source-tag ${source}`}
+      title={
+        source === 'synthetic'
+          ? 'Invented demonstration records'
+          : 'Read through a reviewed private connector'
+      }
+    >
+      {source === 'synthetic' ? 'SYNTHETIC' : 'LIVE'}
+    </span>
+  );
+}
+const statusTone = {
+  completed: 'green',
+  prepared: 'green',
+  needs_input: 'amber',
+  insufficient_evidence: 'amber',
+  blocked: 'red',
+} as const;
+const statusLabel = (s: Mission['status']) =>
+  s === 'prepared' ? 'prepared — not submitted' : s.replaceAll('_', ' ');
+const draftTitle = {
+  'engineering.review': 'Component review draft',
+  'process.start': 'Process start draft',
+} as const;
 export function Spinner() {
   return <LoaderCircle size={17} className="spin" aria-hidden="true" />;
 }
@@ -69,14 +96,14 @@ export function EvidenceCard({ record }: { record: Evidence }) {
         ))}
       </dl>
       <div className="evidence-foot">
-        {record.source === 'synthetic' ? 'Synthetic fixture' : 'Platform read'} ·{' '}
+        <SourceTag source={record.source} />
+        {record.kind ? ` ${record.kind} · ` : ' '}
         {new Date(record.retrievedAt).toLocaleTimeString()}
       </div>
     </details>
   );
 }
 export function Result({ mission, compact = false }: { mission: Mission; compact?: boolean }) {
-  const good = mission.status === 'completed' || mission.status === 'prepared';
   return (
     <div className={`result ${compact ? 'compact-result' : ''}`}>
       <div className="result-heading">
@@ -85,26 +112,41 @@ export function Result({ mission, compact = false }: { mission: Mission; compact
           <strong>NOVA</strong>
           <span>{mission.mode.toLowerCase()}</span>
         </div>
-        <Pill tone={good ? 'green' : 'orange'}>{mission.status.replaceAll('_', ' ')}</Pill>
+        <span className="result-tags">
+          <SourceTag source={mission.source} />
+          <Pill tone={statusTone[mission.status]}>{statusLabel(mission.status)}</Pill>
+        </span>
       </div>
       <h2>{mission.title}</h2>
       <p className="answer">{mission.answer}</p>
       {!!mission.findings.length && (
         <ul className="findings">
-          {mission.findings.map((finding, i) => (
-            <li key={i}>
-              <span className="finding-dot" />
-              <span>{finding}</span>
-            </li>
-          ))}
+          {mission.findings.map((finding, i) => {
+            // Citations like "[id]" stay inspectable without dominating the sentence.
+            const cite = finding.match(/^\[([^\]]{1,300})\]\s*/);
+            return (
+              <li key={i}>
+                <span className="finding-dot" />
+                <span>
+                  {cite ? finding.slice(cite[0].length) : finding}
+                  {cite && (
+                    <span className="cite" title={`Evidence: ${cite[1]}`}>
+                      <FileText size={11} aria-hidden="true" />
+                      <span className="sr-only">Evidence: {cite[1]}</span>
+                    </span>
+                  )}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
       {mission.draft && (
         <div className="draft-card">
           <div>
             <FileText size={20} />
-            <strong>Component review draft</strong>
-            <Pill>Local only</Pill>
+            <strong>{draftTitle[mission.draft.kind || 'engineering.review']}</strong>
+            <Pill tone="amber">Not submitted</Pill>
           </div>
           <p>
             {mission.draft.object} · {mission.draft.evidenceRefs.length} evidence references

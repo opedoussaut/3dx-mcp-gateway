@@ -8,6 +8,8 @@
 | Repository                    | <https://github.com/opedoussaut/3dx-mcp-gateway> |
 | Application baseline          | v0.2.0                                           |
 
+> **Update — NOVA-003, ITEROP first (7 October 2026):** The ITEROP Business Process connector, the synthetic P0 slice and the GEN7 workspace are implemented. See [CONNECTING-ITEROP.md](CONNECTING-ITEROP.md) and [ADR-011](decisions/ADR-011.md). The app opens on **Business Process**. LIVE is `BLOCKED` on an approved route, a credential and the FD04 schemas. Dataset Governance (parked branch) and AURA are deferred. The tables below describe the earlier v0.2 baseline.
+
 ## 1. Ownership and mandate
 
 Claude, Olivier has asked you to take over the **entire project**. You now lead its implementation and evolution: product design, user interface, architecture, runtime, platform integration, models, MCP, evaluation against AURA, quality, documentation, and delivery. This is a continuation of an existing working codebase, not a request for another proposal.

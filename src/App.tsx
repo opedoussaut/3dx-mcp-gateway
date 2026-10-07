@@ -9,7 +9,6 @@ import {
   ChevronDown,
   ChevronRight,
   CircleHelp,
-  Command,
   FlaskConical,
   GitCompareArrows,
   Layers3,
@@ -20,6 +19,7 @@ import {
   Settings2,
   ShieldCheck,
   Unplug,
+  Workflow,
   X,
 } from 'lucide-react';
 import type { Benchmark, Mission, Mode, RuntimeStatus, Source } from '../shared/types';
@@ -28,23 +28,31 @@ import { api } from './api';
 import { ErrorNote, EvidenceCard, NovaMark, Pill, Result, Spinner } from './ui';
 import { CompareView } from './Compare';
 import { Connections, Registry } from './Settings';
+import { IteropWorkspace } from './IteropWorkspace';
 
-type View = 'missions' | 'compare' | 'connections' | 'registry';
+type View = 'process' | 'missions' | 'compare' | 'connections' | 'registry';
 const nav = [
-  { id: 'missions', label: 'Mission control', icon: MessageSquare },
-  { id: 'compare', label: 'AURA comparison', icon: GitCompareArrows },
+  { id: 'process', label: 'Business Process', icon: Workflow },
   { id: 'connections', label: 'Connections', icon: Unplug },
+  { id: 'missions', label: 'Mission control', icon: MessageSquare },
+] as const;
+// Secondary: preserved and working, but not the current mission.
+const laterNav = [
+  { id: 'compare', label: 'AURA comparison', icon: GitCompareArrows },
   { id: 'registry', label: 'Tool registry', icon: Layers3 },
 ] as const;
 const icons = [Search, Box, GitCompareArrows, BookOpen, ShieldCheck];
 const viewNames: Record<View, string> = {
+  process: 'Business Process',
   missions: 'Mission control',
   compare: 'AURA comparison',
   connections: 'Connections',
   registry: 'Tool registry',
 };
 export default function App() {
-  const [view, setView] = useState<View>('missions');
+  const [view, setView] = useState<View>('process');
+  const [iteropSource, setIteropSource] = useState<Source>('synthetic');
+  const [iteropActive, setIteropActive] = useState<Mission | null>(null);
   const [status, setStatus] = useState<RuntimeStatus | null>(null);
   const [source, setSource] = useState<Source>('synthetic');
   const [mode, setMode] = useState<Mode>('ASK');
@@ -113,8 +121,10 @@ export default function App() {
     const handle = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        setView('missions');
-        inputRef.current?.focus();
+        if (view !== 'process') {
+          setView('missions');
+          inputRef.current?.focus();
+        }
       }
       if (e.key === 'Escape') {
         setHelp(false);
@@ -123,7 +133,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handle);
     return () => window.removeEventListener('keydown', handle);
-  }, []);
+  }, [view]);
   const navigate = (next: View) => {
     setView(next);
     setMenuOpen(false);
@@ -157,6 +167,9 @@ export default function App() {
     setMode(b.mode);
     inputRef.current?.focus();
   };
+  const iteropView = view === 'process';
+  const currentSource = iteropView ? iteropSource : source;
+  const currentReady = iteropView ? status?.apps?.ITEROP?.liveReady : status?.liveReady;
   return (
     <div className="app-shell">
       {menuOpen && (
@@ -177,7 +190,7 @@ export default function App() {
         >
           <NovaMark />
           <span>
-            NOVA<small>ENGINEERING COMPANION</small>
+            NOVA<small>ENGINEERING INTELLIGENCE</small>
           </span>
         </a>
         <button
@@ -205,6 +218,20 @@ export default function App() {
             </button>
           ))}
         </nav>
+        <span className="nav-label nav-label-later">LATER</span>
+        <nav aria-label="Secondary navigation" className="nav-later">
+          {laterNav.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              aria-current={view === id ? 'page' : undefined}
+              className={view === id ? 'active' : ''}
+              onClick={() => navigate(id)}
+            >
+              <Icon size={16} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
         <div className="recent-head">
           <span className="nav-label">RECENT MISSIONS</span>
           <span>{history.length}</span>
@@ -214,8 +241,22 @@ export default function App() {
             history.slice(0, 6).map((m) => (
               <button
                 key={m.id}
-                className={active?.id === m.id && view === 'missions' ? 'selected' : ''}
+                className={
+                  (
+                    m.domain === 'ENGINEERING' || !m.domain
+                      ? active?.id === m.id && view === 'missions'
+                      : iteropActive?.id === m.id && view === 'process'
+                  )
+                    ? 'selected'
+                    : ''
+                }
                 onClick={() => {
+                  if (m.domain === 'ITEROP') {
+                    setIteropActive(m);
+                    setIteropSource(m.source);
+                    navigate('process');
+                    return;
+                  }
                   setActive(m);
                   setSource(m.source);
                   navigate('missions');
@@ -266,17 +307,29 @@ export default function App() {
               <ShieldCheck size={14} /> Private by design
             </span>
             <button className="environment-badge" onClick={() => navigate('connections')}>
-              <span className={`status-dot ${source === 'live' ? 'amber' : ''}`} />
-              {source === 'synthetic'
+              <span className={`status-dot ${currentSource === 'live' ? 'amber' : ''}`} />
+              {currentSource === 'synthetic'
                 ? 'Synthetic workspace'
-                : status?.liveReady
-                  ? 'Platform configured'
-                  : 'Platform setup needed'}
+                : currentReady
+                  ? 'Live source configured'
+                  : 'Live setup needed'}
               <ChevronDown size={12} />
             </button>
           </div>
         </header>
-        <main id="main-content">
+        <main id="main-content" className={iteropView ? 'main-gen7' : ''}>
+          {iteropView && (
+            <IteropWorkspace
+              status={status}
+              source={iteropSource}
+              setSource={setIteropSource}
+              active={iteropActive}
+              setActive={setIteropActive}
+              history={history}
+              onMission={addMission}
+              openConnections={() => navigate('connections')}
+            />
+          )}
           {view === 'missions' && (
             <div className={`mission-layout ${active ? 'has-result' : ''}`}>
               <section className="mission-main">
@@ -303,7 +356,7 @@ export default function App() {
                           <BookOpen size={14} /> Traceable answers
                         </span>
                         <span>
-                          <GitCompareArrows size={14} /> AURA comparison
+                          <Workflow size={14} /> Business processes
                         </span>
                       </div>
                     </div>
@@ -397,7 +450,7 @@ export default function App() {
                           onChange={(e) => setSource(e.target.value as Source)}
                         >
                           <option value="synthetic">Synthetic workspace</option>
-                          <option value="live">My 3DEXPERIENCE</option>
+                          <option value="live">My engineering platform</option>
                         </select>
                       </label>
                     </div>
@@ -565,6 +618,7 @@ export default function App() {
                   await api('/session/clear', {});
                   setHistory([]);
                   setActive(null);
+                  setIteropActive(null);
                   setHelp(false);
                 } catch (e) {
                   setError((e as Error).message);

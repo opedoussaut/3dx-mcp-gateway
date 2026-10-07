@@ -29,6 +29,37 @@ test('HTTP workflow isolates sessions, validates origins and preserves unknown A
   try {
     const status = await (await request('/status')).json();
     assert.equal(status.liveReady, false);
+    assert.equal(status.apps.ITEROP.liveReady, false);
+    const process = await (
+      await request('/missions', {
+        prompt: 'What are my current tasks?',
+        source: 'synthetic',
+        mode: 'ASK',
+        domain: 'ITEROP',
+      })
+    ).json();
+    assert.equal(process.domain, 'ITEROP');
+    assert.equal(process.status, 'completed');
+    assert.equal(
+      (
+        await request('/missions', {
+          prompt: 'Show my tasks',
+          source: 'synthetic',
+          mode: 'ASK',
+          domain: 'OTHER',
+        })
+      ).status,
+      400,
+    );
+    assert.equal((await request('/apps/ITEROP/test', {})).status, 409);
+    const flows = await (await request('/iterop/flows')).json();
+    assert.equal(flows.source, 'synthetic');
+    assert.equal(flows.illustration, true);
+    assert.match(flows.notice, /SYNTHETIC ILLUSTRATION/);
+    assert.equal(flows.flows.syn_contractor_form.length, 5);
+    assert.equal((await request('/apps/DATASET_CATALOG/test', {})).status, 404);
+    assert.equal((await request('/apps/UNKNOWN/test', {})).status, 404);
+    await request('/session/clear', {});
     const b = benchmarks[0];
     const mission = await (
       await request('/missions', { prompt: b.prompt, source: 'synthetic', mode: b.mode })

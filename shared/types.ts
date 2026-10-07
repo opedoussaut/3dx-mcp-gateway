@@ -1,7 +1,23 @@
 export type Source = 'synthetic' | 'live';
+/** Application domain chosen explicitly by the operator. Prompt text can never switch it. */
+export type Domain = 'ENGINEERING' | 'ITEROP';
+export type AppDomain = Exclude<Domain, 'ENGINEERING'>;
 export type Mode = 'ASK' | 'INVESTIGATE' | 'ACT';
 export type Intent =
-  'revision' | 'structure' | 'compare' | 'qualification' | 'prepare' | 'search' | 'unknown';
+  | 'revision'
+  | 'structure'
+  | 'compare'
+  | 'qualification'
+  | 'prepare'
+  | 'search'
+  | 'unknown'
+  | AppIntent;
+export type AppIntent =
+  | 'process.startable'
+  | 'process.my_tasks'
+  | 'process.summary'
+  | 'process.task_attention'
+  | 'process.prepare';
 export type ToolName =
   | 'get_current_user'
   | 'search_engineering_items'
@@ -19,6 +35,8 @@ export type Evidence = {
   id: string;
   title: string;
   source: Source;
+  /** Normalized record kind used for canvas rendering, e.g. `process.task`. */
+  kind?: string;
   fields: Record<string, string | number | boolean | null>;
   retrievedAt: string;
 };
@@ -41,6 +59,7 @@ export type Mission = {
   id: string;
   prompt: string;
   source: Source;
+  domain: Domain;
   mode: Mode;
   intent: Intent;
   status: 'completed' | 'needs_input' | 'blocked' | 'insufficient_evidence' | 'prepared';
@@ -59,12 +78,15 @@ export type Mission = {
     writes: 0;
   };
   createdAt: string;
+  /** One entry per upstream operation attempted (application domains). */
+  provenance?: Provenance[];
   draft?: {
     id: string;
     object: string;
     summary: string;
     evidenceRefs: string[];
     status: 'DRAFT_ONLY';
+    kind?: 'engineering.review' | 'process.start';
     expiresAt: string;
     digest: string;
   };
@@ -81,6 +103,29 @@ export type RuntimeStatus = {
   allowedTools: ToolName[];
   provider: string;
   modelReady: boolean;
+  apps: Record<AppDomain, AppStatus>;
+};
+export type AppStatus = {
+  app: AppDomain;
+  label: string;
+  liveReady: boolean;
+  configured: boolean;
+  credentialsPresent: boolean;
+  contractValid: boolean;
+  release: string | null;
+  authMode: string | null;
+  blockers: string[];
+  allowedOperations: string[];
+  specRelease: string;
+  candidateOperations: {
+    name: string;
+    operationId: string;
+    method: string;
+    path: string;
+    description: string;
+    status: 'UNVERIFIED' | 'ADMITTED';
+  }[];
+  accessFinding: string;
 };
 export type Benchmark = {
   id: string;
@@ -107,4 +152,28 @@ export type Comparison = {
   aura: AuraObservation;
   comparability: string;
   auraMetrics: { toolCalls: null; tokens: null; costUsd: null; visibility: 'NOT_OBSERVABLE' };
+};
+export type Provenance = {
+  operation: string;
+  operationId: string;
+  method: 'GET';
+  path: string;
+  specRelease: string;
+  source: Source;
+  scope: string;
+  outcome: 'ok' | 'denied' | 'not_found' | 'error';
+  coverage: Coverage | null;
+  records: number;
+  at: string;
+};
+export type FlowStage = {
+  id: string;
+  label: string;
+  kind: 'start' | 'review' | 'approval' | 'action' | 'end';
+};
+export type FlowIllustrations = {
+  source: 'synthetic';
+  illustration: true;
+  notice: string;
+  flows: Record<string, FlowStage[]>;
 };
