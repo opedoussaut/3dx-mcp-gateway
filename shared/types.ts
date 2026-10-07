@@ -176,4 +176,6 @@ export type FlowIllustrations = {
   illustration: true;
   notice: string;
   flows: Record<string, FlowStage[]>;
+  /** SYNTHETIC illustration only: which stage a synthetic task sits in. */
+  placements: Record<string, string>;
 };

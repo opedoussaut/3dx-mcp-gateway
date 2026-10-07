@@ -40,7 +40,7 @@ test('opens on the most urgent task inside its process, in business language', a
   await expect(
     canvas(page).getByRole('heading', { name: 'Review contractor security form' }),
   ).toBeVisible();
-  await expect(canvas(page).getByText('1 day overdue').first()).toBeVisible();
+  await expect(canvas(page).getByText('Waiting 3 days').first()).toBeVisible();
   const stages = canvas(page).getByRole('list', { name: 'Process stages' });
   await expect(stages.getByRole('listitem')).toHaveCount(5);
   await expect(stages.locator('[aria-current="step"]')).toContainText('Security review');
@@ -122,7 +122,8 @@ test('P0 natural-language questions in English and French', async ({ page }) => 
     ['What workflows are available to me?', '3 processes you can start'],
     ['Quels processus puis-je lancer ?', '3 processes you can start'],
     ['What should I work on first?', 'Start with Review contractor security form'],
-    ['Show my overdue tasks.', '1 overdue task'],
+    ['Show my overdue tasks.', 'Overdue status is not available'],
+    ['Which task has been waiting longest?', 'Start with Review contractor security form'],
     ['Quelles sont mes tâches en cours ?', '3 current tasks'],
     ['Explain the Contractor Form process.', 'Contractor access form'],
   ]) {
@@ -146,9 +147,10 @@ test('cross-user, write and denial outcomes are terminal and explicit', async ({
       copilot(page).getByRole('heading', { name: 'Process changes need a governed workflow' }),
     ).toBeVisible();
   }
+  // FD04 documents 404 "Process unknown" for an unreadable key.
   await ask(page, 'Explain the process key syn_restricted_audit');
   await expect(
-    copilot(page).getByRole('heading', { name: 'Access denied for this identity' }),
+    copilot(page).getByRole('heading', { name: 'No process with that key' }),
   ).toBeVisible();
   await ask(page, 'Prepare to launch the contractor access form', 'Prepare');
   await expect(copilot(page).getByText('prepared — not submitted', { exact: true })).toBeVisible();

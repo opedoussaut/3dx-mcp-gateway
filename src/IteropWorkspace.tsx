@@ -38,7 +38,7 @@ type Listing = { records: Evidence[]; provenance: Provenance; mission: Mission }
 const modeLabel: Record<Mode, string> = { ASK: 'Ask', INVESTIGATE: 'Investigate', ACT: 'Prepare' };
 const starters: Ask[] = [
   { prompt: 'What should I work on first?', mode: 'INVESTIGATE' },
-  { prompt: 'Show my overdue tasks.', mode: 'ASK' },
+  { prompt: 'Which task has been waiting longest?', mode: 'ASK' },
   { prompt: 'Which processes can I start?', mode: 'ASK' },
   { prompt: 'Explain the contractor access form process.', mode: 'ASK' },
   { prompt: 'Quelles sont mes tâches en cours ?', mode: 'ASK' },
@@ -60,14 +60,23 @@ function fullList(m: Mission, kind: string, operationId: string) {
   const records = m.evidence.filter((e) => e.kind === kind);
   return p && records.length === p.records ? { records, provenance: p, mission: m } : null;
 }
-function urgency(t: Evidence) {
-  const due = f(t, 'dueDate');
-  if (!due) return { tone: 'none', label: 'No due date' };
-  const d = days(today(), due);
-  if (d < 0) return { tone: 'late', label: `${-d} ${d === -1 ? 'day' : 'days'} overdue` };
-  if (d === 0) return { tone: 'today', label: 'Due today' };
-  return { tone: 'ok', label: d === 1 ? 'Due tomorrow' : `Due in ${d} days` };
+/** FD04 tasks carry a start date (int64, unit proven per source) and no due date. */
+function waiting(t: Evidence) {
+  const at = f(t, 'startedAt');
+  if (!at)
+    return {
+      tone: 'none',
+      label: f(t, 'startDate') ? 'Start date unit unverified' : 'No start date',
+    };
+  const d = Math.floor((Date.now() - Date.parse(at)) / 86_400_000);
+  return {
+    tone: 'ok',
+    label: d <= 0 ? 'Started today' : `Waiting ${d} ${d === 1 ? 'day' : 'days'}`,
+  };
 }
+const priorityLabel = (t: Evidence) =>
+  f(t, 'priority') === undefined ? 'No priority returned' : `Priority ${f(t, 'priority')}`;
+type Place = (t: Evidence) => string | undefined;
 function suggestions(e: Evidence | null): Ask[] {
   if (!e) return starters;
   if (e.kind === 'process.task')
@@ -207,9 +216,13 @@ export function IteropWorkspace({
     setTab('provenance');
     detailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   };
-  const processOf = (t: Evidence) => processes?.records.find((p) => p.id === f(t, 'processKey'));
+  // FD04 tasks name their process (process.name) but carry no process key: link by exact name.
+  const processOf = (t: Evidence) =>
+    processes?.records.find((p) => p.title === f(t, 'processName'));
+  const keyOf = (t: Evidence) => processOf(t)?.id;
   const tasksIn = (p: Evidence) =>
-    (tasks?.records || []).filter((t) => f(t, 'processKey') === p.id);
+    (tasks?.records || []).filter((t) => f(t, 'processName') === p.title);
+  const placeOf: Place = (t) => (source === 'synthetic' ? flows?.placements?.[t.id] : undefined);
   const evidenceCount = active?.evidence.length || 0;
 
   return (
@@ -297,7 +310,7 @@ export function IteropWorkspace({
             selected={selected}
             choose={choose}
             render={(t) => {
-              const u = urgency(t);
+              const u = waiting(t);
               return (
                 <>
                   <strong>{t.title}</strong>
@@ -323,7 +336,9 @@ export function IteropWorkspace({
             render={(p) => (
               <>
                 <strong>{p.title}</strong>
-                <span className="g7-meta">{f(p, 'category') || 'Uncategorised'}</span>
+                <span className="g7-meta">
+                  {f(p, 'version') ? `Version ${f(p, 'version')}` : 'Version not returned'}
+                </span>
               </>
             )}
           />
@@ -359,9 +374,10 @@ export function IteropWorkspace({
               <TaskScene
                 task={selectedRecord}
                 process={processOf(selectedRecord)}
-                flow={flowFor(f(selectedRecord, 'processKey'))}
+                flow={flowFor(keyOf(selectedRecord))}
+                placeOf={placeOf}
                 siblings={(tasks?.records || []).filter(
-                  (t) => f(t, 'processKey') === f(selectedRecord, 'processKey'),
+                  (t) => f(t, 'processName') === f(selectedRecord, 'processName'),
                 )}
                 notice={flows?.notice}
                 source={source}
@@ -375,6 +391,7 @@ export function IteropWorkspace({
                 process={selectedRecord}
                 flow={flowFor(selectedRecord.id)}
                 tasks={tasksIn(selectedRecord)}
+                placeOf={placeOf}
                 notice={flows?.notice}
                 source={source}
                 onOpen={(e) => choose(e)}
@@ -382,7 +399,13 @@ export function IteropWorkspace({
                 loading={loading}
               />
             ) : active ? (
-              <AnswerScene mission={active} flowFor={flowFor} choose={choose} />
+              <AnswerScene
+                mission={active}
+                flowFor={flowFor}
+                keyOf={keyOf}
+                placeOf={placeOf}
+                choose={choose}
+              />
             ) : (
               <div className="g7-empty">
                 <Workflow size={30} strokeWidth={1.2} />
@@ -693,6 +716,7 @@ function TaskScene({
   process,
   flow,
   siblings,
+  placeOf,
   notice,
   source,
   onOpen,
@@ -704,6 +728,7 @@ function TaskScene({
   process?: Evidence;
   flow?: FlowStage[];
   siblings: Evidence[];
+  placeOf: Place;
   notice?: string;
   source: Source;
   onOpen: (e: Evidence) => void;
@@ -711,9 +736,9 @@ function TaskScene({
   onEvidence: () => void;
   loading: boolean;
 }) {
-  const u = urgency(task);
+  const u = waiting(task);
   const counts = siblings.reduce<Record<string, number>>((a, t) => {
-    const s = f(t, 'step');
+    const s = placeOf(t);
     if (s) a[s] = (a[s] || 0) + 1;
     return a;
   }, {});
@@ -729,10 +754,8 @@ function TaskScene({
             <span className={`g7-state-chip ${u.tone}`}>
               <CalendarClock size={13} /> {u.label}
             </span>
-            <span className="g7-state-chip">{titleCase(f(task, 'priority')) || 'No'} priority</span>
-            <span className="g7-state-chip">
-              {titleCase(f(task, 'status')) || 'Status unknown'}
-            </span>
+            <span className="g7-state-chip">{priorityLabel(task)}</span>
+            <span className="g7-state-chip">Active task</span>
           </div>
         </div>
         <div className="g7-scene-actions">
@@ -748,7 +771,7 @@ function TaskScene({
         </div>
       </header>
       {flow ? (
-        <Flow stages={flow} here={f(task, 'step')} counts={counts} notice={notice} />
+        <Flow stages={flow} here={placeOf(task)} counts={counts} notice={notice} />
       ) : (
         <FlowUnavailable source={source} />
       )}
@@ -793,6 +816,7 @@ function ProcessScene({
   process,
   flow,
   tasks,
+  placeOf,
   notice,
   source,
   onOpen,
@@ -802,6 +826,7 @@ function ProcessScene({
   process: Evidence;
   flow?: FlowStage[];
   tasks: Evidence[];
+  placeOf: Place;
   notice?: string;
   source: Source;
   onOpen: (e: Evidence) => void;
@@ -809,18 +834,17 @@ function ProcessScene({
   loading: boolean;
 }) {
   const counts = tasks.reduce<Record<string, number>>((a, t) => {
-    const s = f(t, 'step');
+    const s = placeOf(t);
     if (s) a[s] = (a[s] || 0) + 1;
     return a;
   }, {});
-  const focus = tasks.find((t) => f(t, 'step'));
+  const focus = tasks.find((t) => placeOf(t));
   return (
     <div className="g7-scene">
       <header className="g7-scene-head">
         <div>
           <span className="g7-eyebrow">
-            {f(process, 'category') || 'Process'}
-            {f(process, 'version') ? ` · version ${f(process, 'version')}` : ''}
+            Process{f(process, 'version') ? ` · version ${f(process, 'version')}` : ''}
           </span>
           <h2>{process.title}</h2>
           <p className="g7-description">
@@ -854,7 +878,7 @@ function ProcessScene({
       {flow ? (
         <Flow
           stages={flow}
-          here={focus ? f(focus, 'step') : undefined}
+          here={focus ? placeOf(focus) : undefined}
           counts={counts}
           notice={notice}
         />
@@ -867,7 +891,7 @@ function ProcessScene({
           {tasks.length ? (
             <ul className="g7-tile-list">
               {tasks.map((t) => {
-                const u = urgency(t);
+                const u = waiting(t);
                 return (
                   <li key={t.id}>
                     <button onClick={() => onOpen(t)}>
@@ -895,42 +919,30 @@ function ProcessScene({
 }
 
 function MiniTimeline({ task }: { task: Evidence }) {
-  const created = f(task, 'createdAt');
-  const due = f(task, 'dueDate');
+  const started = f(task, 'startedAt');
+  if (!started)
+    return (
+      <p>
+        {f(task, 'startDate')
+          ? 'A start date is returned, but its unit is not yet confirmed for this source.'
+          : 'No start date returned.'}
+      </p>
+    );
+  const startDay = started.slice(0, 10);
   const now = today();
-  if (!created && !due) return <p>No dates declared.</p>;
-  const start = created || now;
-  const end = due && due > now ? due : now;
-  const span = Math.max(1, days(start, end));
-  const pos = (d: string) => `${Math.min(100, Math.max(0, (days(start, d) / span) * 100))}%`;
+  const span = Math.max(1, days(startDay, now));
   return (
     <div className="g7-mini-time" aria-label="Task timeline">
       <div className="g7-mini-track">
-        {due && (
-          <span
-            className={`g7-mini-span ${due < now ? 'late' : ''}`}
-            style={{
-              left: pos(due < now ? due : start),
-              right: `calc(100% - ${pos(due < now ? now : due)})`,
-            }}
-          />
-        )}
-        {created && <i style={{ left: pos(created) }} title={`Created ${created}`} />}
-        <i className="now" style={{ left: pos(now) }} title="Today" />
-        {due && (
-          <i
-            className={due < now ? 'late' : 'due'}
-            style={{ left: pos(due) }}
-            title={`Due ${due}`}
-          />
-        )}
+        <span className="g7-mini-span" style={{ left: '0%', right: '0%' }} />
+        <i style={{ left: '0%' }} title={`Started ${startDay}`} />
+        <i className="now" style={{ left: '100%' }} title="Today" />
       </div>
       <div className="g7-mini-labels">
-        {created && <span>Created {created.slice(5)}</span>}
-        <span className={due && due < now ? 'late' : ''}>
-          {due ? `Due ${due.slice(5)}` : 'No due date'}
+        <span>Started {startDay.slice(5)}</span>
+        <span className="now">
+          Today {now.slice(5)} · {span} {span === 1 ? 'day' : 'days'}
         </span>
-        <span className="now">Today {now.slice(5)}</span>
       </div>
     </div>
   );
@@ -939,10 +951,14 @@ function MiniTimeline({ task }: { task: Evidence }) {
 function AnswerScene({
   mission,
   flowFor,
+  keyOf,
+  placeOf,
   choose,
 }: {
   mission: Mission;
   flowFor: (k?: string) => FlowStage[] | undefined;
+  keyOf: (t: Evidence) => string | undefined;
+  placeOf: Place;
   choose: (e: Evidence) => void;
 }) {
   if (!mission.evidence.length)
@@ -962,8 +978,8 @@ function AnswerScene({
     return (
       <ol className="g7-agenda" aria-label="Tasks">
         {tasks.map((t, i) => {
-          const u = urgency(t);
-          const flow = flowFor(f(t, 'processKey'));
+          const u = waiting(t);
+          const flow = flowFor(keyOf(t));
           return (
             <li key={t.id}>
               <span className="g7-agenda-rank">{String(i + 1).padStart(2, '0')}</span>
@@ -973,10 +989,9 @@ function AnswerScene({
                   <span className={`g7-due ${u.tone}`}>{u.label}</span>
                 </span>
                 <span className="g7-meta">
-                  {f(t, 'processName') || 'Process not declared'} ·{' '}
-                  {titleCase(f(t, 'priority')) || 'No'} priority
+                  {f(t, 'processName') || 'Process not returned'} · {priorityLabel(t)}
                 </span>
-                {flow && <Flow stages={flow} here={f(t, 'step')} compact />}
+                {flow && <Flow stages={flow} here={placeOf(t)} compact />}
               </button>
             </li>
           );
@@ -989,7 +1004,9 @@ function AnswerScene({
         const flow = flowFor(d.id);
         return (
           <button key={d.id} onClick={() => choose(d)} className="g7-card">
-            <span className="g7-eyebrow">{f(d, 'category') || 'Process'}</span>
+            <span className="g7-eyebrow">
+              Process{f(d, 'version') ? ` · version ${f(d, 'version')}` : ''}
+            </span>
             <strong>{d.title}</strong>
             <p>{f(d, 'description') || 'No description returned.'}</p>
             {flow && <Flow stages={flow} compact />}

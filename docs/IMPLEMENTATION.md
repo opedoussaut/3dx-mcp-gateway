@@ -22,7 +22,12 @@ The v0.1 blueprint remains the architecture target. This implementation turns it
   - Live is an explicit gate: no request is made and nothing falls back to synthetic data;
   - mobile uses a My tasks | Processes switch and stacked provenance cards;
   - AURA and the Tool registry sit under a secondary "Later" navigation group.
-- **LIVE: `BLOCKED`.** The FD04 schemas are pending (the file could not be retrieved), and no approved route or credential exists. See `docs/CONNECTING-ITEROP.md`.
+- **FD04 schema alignment (live-read readiness):**
+  - the official R2026x-FD04 OpenAPI has been parsed (SHA-256 verified);
+  - NOVA validates the three response bodies with schemas written for FD04 (`server/iterop/fd04.ts`);
+  - synthetic fixtures are FD04-shaped and go through the same projection as live responses;
+  - the UI no longer relies on fields FD04 does not return (due date, status, process key, step).
+- **LIVE: `BLOCKED`** on a sanctioned route and a read-only credential that acts as Olivier himself. See `docs/iterop/ACCESS-REQUEST.md` and `docs/iterop/FIRST-LIVE-TEST.md`.
 - Dataset Governance work is parked on the branch `claude/dataset-governance-parked`.
 
 ## Implemented

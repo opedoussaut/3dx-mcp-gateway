@@ -120,8 +120,8 @@ export function createApp(
   // SYNTHETIC illustration only: no P0 operation returns process steps. A live flow would need
   // the reviewed P1 operation getProcessInfo, which is not admitted.
   app.get('/api/iterop/flows', (_req, res) => {
-    const { notice, ...flows } = iteropFixture.flows;
-    res.json({ source: 'synthetic', illustration: true, notice, flows });
+    const { notice, placements, ...flows } = iteropFixture.flows;
+    res.json({ source: 'synthetic', illustration: true, notice, flows, placements });
   });
   app.get('/api/registry', (_req, res) =>
     res.json(
