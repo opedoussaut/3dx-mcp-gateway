@@ -2,15 +2,22 @@
 
 The v0.1 blueprint remains the architecture target. This implementation turns its first read-only slice into a runnable local application; it does not claim all blueprint components are complete.
 
-## NOVA-003 additions (7 October 2026)
+## NOVA-003 — ITEROP first (7 October 2026)
 
-- Independent application connectors in `server/apps/`: **ITEROP** (Business Process) and **DATASET_CATALOG** (Datasets Governance). Each has its own origin, credential, release-scoped contract schema, operation registry, field allowlist and connection test. Neither shares anything with the engineering gateway or with the other.
-- A deterministic EN/FR natural-language router per domain. The operator selects the domain in the UI; prompt text cannot change the domain, origin or credential.
-- Synthetic, principal-scoped adapters, including denial and not-found cases. 11 representative questions across the two apps, plus refusal of write and extraction requests.
-- Process start and task completion are only _prepared_ as local drafts (`PREPARED — NOT SUBMITTED`).
-- MCP: 9 additional read tools (`iterop_*`, `catalog_*`). They are synthetic by default; in live mode only admitted operations are exposed.
-- GEN7 workspace UI for both apps: context rail, canvas (task agenda, process timeline, catalog cards, lineage and relationship maps), and a NOVA Intelligence sidecar with mode, source, evidence and trace. Selection on the canvas drives contextual follow-up questions. The shell was rethemed from orange to industrial blue, with the Inter font bundled locally.
-- **Live reads in both apps: `BLOCKED`** on access and contracts. See `docs/CONNECTING-APPS.md`.
+- `server/iterop/`: a dedicated ITEROP connector with its own origin, credential, contract and probe. Its operation inventory holds the three R2026x-FD04 P0 operations: `getAllStartableProcesses`, `getTasksByUser` and `getBasicProcessInfo`. A contract can bind only those operationIds; paths come from the inventory.
+- Deterministic English/French routing for: startable processes; current, overdue and next tasks; process summary (with name resolution against your startable list); and task attention. Cross-user requests and all writes are refused before any call.
+- Every upstream attempt carries provenance: operationId, documented call, spec release, source, scope, outcome, coverage and time.
+- MCP exposes `iterop_*` read tools: synthetic by default, and only admitted operations in live mode.
+- GEN7 Business Process workspace:
+  - processes and tasks rail;
+  - a canvas for the business object (task timeline, process context);
+  - the NOVA Intelligence sidecar;
+  - provenance, evidence and trace tabs.
+
+  The shell is rethemed to industrial blue, and the Inter font is bundled locally.
+
+- **LIVE: `BLOCKED`.** The FD04 schemas are pending (the file could not be retrieved), and no approved route or credential exists. See `docs/CONNECTING-ITEROP.md`.
+- Dataset Governance work is parked on the branch `claude/dataset-governance-parked`.
 
 ## Implemented
 

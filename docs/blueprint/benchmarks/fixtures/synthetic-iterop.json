@@ -1,0 +1,17 @@
+{
+  "notice": "SYNTHETIC FIXTURE. Invented business-process data for NOVA testing. Not derived from any tenant, customer, screenshot or real ITEROP deployment. Field names are NOVA-normalized; upstream field mapping comes only from a reviewed private contract.",
+  "principal": { "displayName": "Demo operator" },
+  "processes": [
+    { "processKey": "syn_engineering_change", "name": "Engineering change request", "description": "Request, assess and approve a design change before release to manufacturing.", "version": "3", "category": "Engineering", "startable": true },
+    { "processKey": "syn_contractor_form", "name": "Contractor access form", "description": "Request site and system access for an external contractor, with security review and badge provisioning.", "version": "2", "category": "Operations", "startable": true },
+    { "processKey": "syn_tooling_purchase", "name": "Tooling purchase request", "description": "Request budget approval and a purchase order for production tooling.", "version": "5", "category": "Procurement", "startable": true },
+    { "processKey": "syn_supplier_onboarding", "name": "Supplier onboarding", "description": "Qualify and register a new supplier.", "version": "4", "category": "Procurement", "startable": false },
+    { "processKey": "syn_restricted_audit", "name": "Restricted audit", "description": "Restricted.", "version": "1", "category": "Restricted", "startable": false, "visible": false }
+  ],
+  "tasks": [
+    { "taskId": "syn-task-301", "name": "Approve quality impact", "processKey": "syn_engineering_change", "processInstanceId": "syn-inst-1042", "status": "OPEN", "priority": "HIGH", "dueOffsetDays": 1, "createdOffsetDays": -4, "assignee": "self" },
+    { "taskId": "syn-task-302", "name": "Review contractor security form", "processKey": "syn_contractor_form", "processInstanceId": "syn-inst-1057", "status": "OPEN", "priority": "MEDIUM", "dueOffsetDays": -1, "createdOffsetDays": -3, "assignee": "self" },
+    { "taskId": "syn-task-305", "name": "Confirm test-lab calibration evidence", "processKey": "syn_engineering_change", "processInstanceId": "syn-inst-1042", "status": "OPEN", "priority": "LOW", "createdOffsetDays": -2, "assignee": "self" },
+    { "taskId": "syn-task-310", "name": "Board sign-off", "processKey": "syn_engineering_change", "processInstanceId": "syn-inst-1042", "status": "OPEN", "priority": "HIGH", "dueOffsetDays": 6, "createdOffsetDays": -1, "assignee": "another-user" }
+  ]
+}

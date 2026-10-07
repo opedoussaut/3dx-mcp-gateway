@@ -1,14 +1,16 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "app": "ITEROP",
-  "release": "REPLACE_WITH_VERIFIED_RELEASE",
+  "release": "REPLACE_WITH_DEPLOYED_RELEASE",
+  "specRelease": "R2026x-FD04",
   "apiVersion": "REPLACE_WITH_DOCUMENTED_API_VERSION",
   "authenticationVerified": false,
   "authMode": "basic",
   "securityContext": "NOT_REQUIRED",
   "reviewedBy": "",
   "verifiedAt": "",
+  "basePath": "",
   "probe": { "operation": "iterop.list_my_tasks" },
   "operations": {},
-  "templateNote": "INTENTIONALLY BLOCKED. Fill only from reviewed, release-specific official documentation and an approved credential (docs/CONNECTING-APPS.md). No ITEROP endpoint path is supplied or implied."
+  "templateNote": "INTENTIONALLY BLOCKED. Bind only getAllStartableProcesses, getTasksByUser and getBasicProcessInfo after reviewing the R2026x-FD04 schemas and an approved credential (docs/CONNECTING-ITEROP.md). Paths come from NOVA's operation inventory, never from this file."
 }

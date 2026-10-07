@@ -1,6 +1,6 @@
 export type Source = 'synthetic' | 'live';
 /** Application domain chosen explicitly by the operator. Prompt text can never switch it. */
-export type Domain = 'ENGINEERING' | 'ITEROP' | 'DATASET_CATALOG';
+export type Domain = 'ENGINEERING' | 'ITEROP';
 export type AppDomain = Exclude<Domain, 'ENGINEERING'>;
 export type Mode = 'ASK' | 'INVESTIGATE' | 'ACT';
 export type Intent =
@@ -15,15 +15,9 @@ export type Intent =
 export type AppIntent =
   | 'process.startable'
   | 'process.my_tasks'
-  | 'process.status'
-  | 'process.remaining_steps'
+  | 'process.summary'
   | 'process.task_attention'
-  | 'process.prepare'
-  | 'catalog.search'
-  | 'catalog.owner'
-  | 'catalog.related'
-  | 'catalog.lineage'
-  | 'catalog.suitability';
+  | 'process.prepare';
 export type ToolName =
   | 'get_current_user'
   | 'search_engineering_items'
@@ -84,13 +78,15 @@ export type Mission = {
     writes: 0;
   };
   createdAt: string;
+  /** One entry per upstream operation attempted (application domains). */
+  provenance?: Provenance[];
   draft?: {
     id: string;
     object: string;
     summary: string;
     evidenceRefs: string[];
     status: 'DRAFT_ONLY';
-    kind?: 'engineering.review' | 'process.start' | 'process.complete_task';
+    kind?: 'engineering.review' | 'process.start';
     expiresAt: string;
     digest: string;
   };
@@ -120,7 +116,15 @@ export type AppStatus = {
   authMode: string | null;
   blockers: string[];
   allowedOperations: string[];
-  candidateOperations: { name: string; description: string; status: 'UNVERIFIED' | 'ADMITTED' }[];
+  specRelease: string;
+  candidateOperations: {
+    name: string;
+    operationId: string;
+    method: string;
+    path: string;
+    description: string;
+    status: 'UNVERIFIED' | 'ADMITTED';
+  }[];
   accessFinding: string;
 };
 export type Benchmark = {
@@ -148,4 +152,17 @@ export type Comparison = {
   aura: AuraObservation;
   comparability: string;
   auraMetrics: { toolCalls: null; tokens: null; costUsd: null; visibility: 'NOT_OBSERVABLE' };
+};
+export type Provenance = {
+  operation: string;
+  operationId: string;
+  method: 'GET';
+  path: string;
+  specRelease: string;
+  source: Source;
+  scope: string;
+  outcome: 'ok' | 'denied' | 'not_found' | 'error';
+  coverage: Coverage | null;
+  records: number;
+  at: string;
 };

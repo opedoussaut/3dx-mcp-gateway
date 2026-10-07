@@ -9,7 +9,6 @@ import {
   ChevronDown,
   ChevronRight,
   CircleHelp,
-  Database,
   FlaskConical,
   GitCompareArrows,
   Layers3,
@@ -23,24 +22,17 @@ import {
   Workflow,
   X,
 } from 'lucide-react';
-import type { AppDomain, Benchmark, Mission, Mode, RuntimeStatus, Source } from '../shared/types';
+import type { Benchmark, Mission, Mode, RuntimeStatus, Source } from '../shared/types';
 import { benchmarks } from '../shared/benchmarks';
 import { api } from './api';
 import { ErrorNote, EvidenceCard, NovaMark, Pill, Result, Spinner } from './ui';
 import { CompareView } from './Compare';
 import { Connections, Registry } from './Settings';
-import { AppWorkspace } from './AppWorkspace';
+import { IteropWorkspace } from './IteropWorkspace';
 
-type View = 'process' | 'catalog' | 'missions' | 'compare' | 'connections' | 'registry';
-const viewDomain = { process: 'ITEROP', catalog: 'DATASET_CATALOG' } as const;
-const domainView = {
-  ITEROP: 'process',
-  DATASET_CATALOG: 'catalog',
-  ENGINEERING: 'missions',
-} as const;
+type View = 'process' | 'missions' | 'compare' | 'connections' | 'registry';
 const nav = [
   { id: 'process', label: 'Business Process', icon: Workflow },
-  { id: 'catalog', label: 'Datasets Governance', icon: Database },
   { id: 'missions', label: 'Mission control', icon: MessageSquare },
   { id: 'compare', label: 'AURA comparison', icon: GitCompareArrows },
   { id: 'connections', label: 'Connections', icon: Unplug },
@@ -49,7 +41,6 @@ const nav = [
 const icons = [Search, Box, GitCompareArrows, BookOpen, ShieldCheck];
 const viewNames: Record<View, string> = {
   process: 'Business Process',
-  catalog: 'Datasets Governance',
   missions: 'Mission control',
   compare: 'AURA comparison',
   connections: 'Connections',
@@ -57,14 +48,8 @@ const viewNames: Record<View, string> = {
 };
 export default function App() {
   const [view, setView] = useState<View>('process');
-  const [appSource, setAppSource] = useState<Record<AppDomain, Source>>({
-    ITEROP: 'synthetic',
-    DATASET_CATALOG: 'synthetic',
-  });
-  const [appActive, setAppActive] = useState<Record<AppDomain, Mission | null>>({
-    ITEROP: null,
-    DATASET_CATALOG: null,
-  });
+  const [iteropSource, setIteropSource] = useState<Source>('synthetic');
+  const [iteropActive, setIteropActive] = useState<Mission | null>(null);
   const [status, setStatus] = useState<RuntimeStatus | null>(null);
   const [source, setSource] = useState<Source>('synthetic');
   const [mode, setMode] = useState<Mode>('ASK');
@@ -133,7 +118,7 @@ export default function App() {
     const handle = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        if (view !== 'process' && view !== 'catalog') {
+        if (view !== 'process') {
           setView('missions');
           inputRef.current?.focus();
         }
@@ -179,9 +164,9 @@ export default function App() {
     setMode(b.mode);
     inputRef.current?.focus();
   };
-  const currentDomain = view === 'process' || view === 'catalog' ? viewDomain[view] : null;
-  const currentSource = currentDomain ? appSource[currentDomain] : source;
-  const currentReady = currentDomain ? status?.apps?.[currentDomain]?.liveReady : status?.liveReady;
+  const iteropView = view === 'process';
+  const currentSource = iteropView ? iteropSource : source;
+  const currentReady = iteropView ? status?.apps?.ITEROP?.liveReady : status?.liveReady;
   return (
     <div className="app-shell">
       {menuOpen && (
@@ -243,16 +228,16 @@ export default function App() {
                   (
                     m.domain === 'ENGINEERING' || !m.domain
                       ? active?.id === m.id && view === 'missions'
-                      : appActive[m.domain]?.id === m.id && view === domainView[m.domain]
+                      : iteropActive?.id === m.id && view === 'process'
                   )
                     ? 'selected'
                     : ''
                 }
                 onClick={() => {
-                  if (m.domain && m.domain !== 'ENGINEERING') {
-                    setAppActive((a) => ({ ...a, [m.domain]: m }));
-                    setAppSource((s) => ({ ...s, [m.domain]: m.source }));
-                    navigate(domainView[m.domain]);
+                  if (m.domain === 'ITEROP') {
+                    setIteropActive(m);
+                    setIteropSource(m.source);
+                    navigate('process');
                     return;
                   }
                   setActive(m);
@@ -315,16 +300,14 @@ export default function App() {
             </button>
           </div>
         </header>
-        <main id="main-content" className={currentDomain ? 'main-gen7' : ''}>
-          {currentDomain && (
-            <AppWorkspace
-              key={currentDomain}
-              domain={currentDomain}
+        <main id="main-content" className={iteropView ? 'main-gen7' : ''}>
+          {iteropView && (
+            <IteropWorkspace
               status={status}
-              source={appSource[currentDomain]}
-              setSource={(s) => setAppSource((v) => ({ ...v, [currentDomain]: s }))}
-              active={appActive[currentDomain]}
-              setActive={(m) => setAppActive((v) => ({ ...v, [currentDomain]: m }))}
+              source={iteropSource}
+              setSource={setIteropSource}
+              active={iteropActive}
+              setActive={setIteropActive}
               history={history}
               onMission={addMission}
               openConnections={() => navigate('connections')}
@@ -618,7 +601,7 @@ export default function App() {
                   await api('/session/clear', {});
                   setHistory([]);
                   setActive(null);
-                  setAppActive({ ITEROP: null, DATASET_CATALOG: null });
+                  setIteropActive(null);
                   setHelp(false);
                 } catch (e) {
                   setError((e as Error).message);

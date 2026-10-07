@@ -21,9 +21,10 @@ test('MCP stdio exposes bounded read tools and returns labelled synthetic eviden
   try {
     await client.connect(transport);
     const tools = await client.listTools();
-    assert.equal(tools.tools.length, 17);
+    assert.equal(tools.tools.length, 11);
     assert.ok(tools.tools.some((t) => t.name === 'iterop_list_my_tasks'));
-    assert.ok(tools.tools.some((t) => t.name === 'catalog_get_dataset'));
+    assert.ok(tools.tools.some((t) => t.name === 'iterop_get_process_summary'));
+    assert.ok(!tools.tools.some((t) => /catalog|start_process/.test(t.name)));
     assert.ok(tools.tools.every((t) => t.annotations?.readOnlyHint === true));
     assert.ok(!tools.tools.some((t) => /submit|delete|commit|execute|request/i.test(t.name)));
     const result = await client.callTool({
@@ -38,9 +39,10 @@ test('MCP stdio exposes bounded read tools and returns labelled synthetic eviden
     const taskData = JSON.parse((tasks.content as { type: string; text: string }[])[0].text);
     assert.equal(taskData.source, 'synthetic');
     assert.equal(taskData.records.length, 3);
+    assert.equal(taskData.operationId, 'getTasksByUser');
     const denied = await client.callTool({
-      name: 'catalog_get_dataset',
-      arguments: { id: 'DS-SYN-SUPPLIER-PRICES' },
+      name: 'iterop_get_process_summary',
+      arguments: { processKey: 'syn_restricted_audit' },
     });
     assert.equal(denied.isError, true);
     const invalid = await client.callTool({

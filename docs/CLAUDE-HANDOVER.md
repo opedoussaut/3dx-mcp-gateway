@@ -8,7 +8,7 @@
 | Repository                    | <https://github.com/opedoussaut/3dx-mcp-gateway> |
 | Application baseline          | v0.2.0                                           |
 
-> **Update — NOVA-003 (7 October 2026):** The Business Process (ITEROP) and Datasets Governance connectors, synthetic vertical slices and GEN7 workspace are implemented. See [CONNECTING-APPS.md](CONNECTING-APPS.md) and [ADR-011](decisions/ADR-011.md). The app now opens on **Business Process**. Live reads for both apps are `BLOCKED` on approved access and documented contracts. AURA work is deferred. The tables below describe the earlier v0.2 baseline.
+> **Update — NOVA-003, ITEROP first (7 October 2026):** The ITEROP Business Process connector, the synthetic P0 slice and the GEN7 workspace are implemented. See [CONNECTING-ITEROP.md](CONNECTING-ITEROP.md) and [ADR-011](decisions/ADR-011.md). The app opens on **Business Process**. LIVE is `BLOCKED` on an approved route, a credential and the FD04 schemas. Dataset Governance (parked branch) and AURA are deferred. The tables below describe the earlier v0.2 baseline.
 
 ## 1. Ownership and mandate
 

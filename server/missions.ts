@@ -1,6 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type {
-  AppDomain,
   Domain,
   Evidence,
   Intent,
@@ -13,22 +12,18 @@ import type {
 } from '../shared/types';
 import { Gateway, GatewayError, evidence } from './gateway';
 import { deterministicRoute, OllamaProvider, type ModelProvider } from './provider';
-import { AppConnector } from './apps/connector';
-import { loadAppConfig } from './apps/config';
-import { runAppMission } from './apps/missions';
+import { IteropConnector } from './iterop/connector';
+import { loadIteropConfig } from './iterop/config';
+import { runIteropMission } from './iterop/missions';
 
 export class MissionRunner {
-  private apps: Record<AppDomain, AppConnector>;
+  private iterop: IteropConnector;
   constructor(
     private gateway: Gateway,
     private provider?: ModelProvider,
-    apps?: Partial<Record<AppDomain, AppConnector>>,
+    iterop?: IteropConnector,
   ) {
-    this.apps = {
-      ITEROP: apps?.ITEROP || new AppConnector(loadAppConfig('ITEROP', {})),
-      DATASET_CATALOG:
-        apps?.DATASET_CATALOG || new AppConnector(loadAppConfig('DATASET_CATALOG', {})),
-    };
+    this.iterop = iterop || new IteropConnector(loadIteropConfig({}));
   }
   async run(
     prompt: string,
@@ -90,9 +85,9 @@ export class MissionRunner {
         `${domain} selected by the operator. Its origin, credential and contract are independent.`,
         'policy',
       );
-      return runAppMission({
+      return runIteropMission({
         mission,
-        connector: this.apps[domain],
+        connector: this.iterop,
         source,
         mode,
         prompt,

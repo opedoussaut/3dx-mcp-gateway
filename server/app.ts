@@ -4,9 +4,8 @@ import { z } from 'zod';
 import { loadConfig, runtimeStatus, type Config } from './config';
 import { Gateway, GatewayError } from './gateway';
 import { MissionRunner } from './missions';
-import { AppConnector } from './apps/connector';
-import { appStatus, loadAppConfig } from './apps/config';
-import type { AppDomain } from '../shared/types';
+import { IteropConnector } from './iterop/connector';
+import { iteropStatus, loadIteropConfig } from './iterop/config';
 import type { Comparison, Mission } from '../shared/types';
 import { benchmarks } from '../shared/benchmarks';
 import corpus from '../docs/blueprint/benchmarks/fixtures/synthetic-engineering-corpus.json';
@@ -17,7 +16,7 @@ const missionInput = z
     prompt: z.string().trim().min(3).max(2000),
     source: z.enum(['synthetic', 'live']),
     mode: z.enum(['ASK', 'INVESTIGATE', 'ACT']),
-    domain: z.enum(['ENGINEERING', 'ITEROP', 'DATASET_CATALOG']).default('ENGINEERING'),
+    domain: z.enum(['ENGINEERING', 'ITEROP']).default('ENGINEERING'),
   })
   .strict();
 const score = z.number().int().min(0).max(2).nullable();
@@ -49,20 +48,14 @@ type Session = {
 export function createApp(
   config: Config = loadConfig(),
   gateway = new Gateway(config),
-  apps: Record<AppDomain, AppConnector> = {
-    ITEROP: new AppConnector(loadAppConfig('ITEROP')),
-    DATASET_CATALOG: new AppConnector(loadAppConfig('DATASET_CATALOG')),
-  },
+  iterop = new IteropConnector(loadIteropConfig()),
 ) {
   const app = express();
   const sessions = new Map<string, Session>();
-  const runner = new MissionRunner(gateway, undefined, apps);
+  const runner = new MissionRunner(gateway, undefined, iterop);
   const status = () => ({
     ...runtimeStatus(config),
-    apps: {
-      ITEROP: appStatus(apps.ITEROP.config),
-      DATASET_CATALOG: appStatus(apps.DATASET_CATALOG.config),
-    },
+    apps: { ITEROP: iteropStatus(iterop.config) },
   });
   app.disable('x-powered-by');
   app.use((req, res, next) => {
@@ -197,9 +190,8 @@ export function createApp(
   });
   app.post('/api/apps/:app/test', async (req, res) => {
     const name = req.params.app;
-    if (name !== 'ITEROP' && name !== 'DATASET_CATALOG')
-      return res.status(404).json({ error: 'Unknown application.' });
-    const connector = apps[name];
+    if (name !== 'ITEROP') return res.status(404).json({ error: 'Unknown application.' });
+    const connector = iterop;
     const contract = connector.config.contract;
     if (connector.config.blockers.length || !contract)
       return res.status(409).json({
@@ -207,11 +199,7 @@ export function createApp(
           'This application needs its private origin, credential and reviewed contract. No request was made.',
       });
     try {
-      const result = await connector.call(
-        contract.probe.operation,
-        contract.probe.query ? { query: contract.probe.query } : {},
-        'live',
-      );
+      const result = await connector.call(contract.probe.operation, {}, 'live');
       res.json({
         ok: true,
         checkedAt: new Date().toISOString(),

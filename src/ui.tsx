@@ -45,7 +45,6 @@ const statusLabel = (s: Mission['status']) =>
 const draftTitle = {
   'engineering.review': 'Component review draft',
   'process.start': 'Process start draft',
-  'process.complete_task': 'Task completion draft',
 } as const;
 export function Spinner() {
   return <LoaderCircle size={17} className="spin" aria-hidden="true" />;

@@ -11,6 +11,10 @@ async function navigate(page: Page, name: string) {
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Business Process', level: 1 })).toBeVisible();
+  // The synthetic Business Process rail loads first; wait so the session is idle.
+  await expect(
+    page.getByRole('region', { name: 'My tasks' }).getByText('getTasksByUser', { exact: false }),
+  ).toBeVisible();
   await navigate(page, 'Mission control');
   await expect(
     page.getByRole('heading', { name: 'From a question to a clear next step.' }),

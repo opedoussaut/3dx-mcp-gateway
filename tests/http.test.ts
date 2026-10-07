@@ -30,10 +30,9 @@ test('HTTP workflow isolates sessions, validates origins and preserves unknown A
     const status = await (await request('/status')).json();
     assert.equal(status.liveReady, false);
     assert.equal(status.apps.ITEROP.liveReady, false);
-    assert.equal(status.apps.DATASET_CATALOG.liveReady, false);
     const process = await (
       await request('/missions', {
-        prompt: 'Show the tasks assigned to me',
+        prompt: 'What are my current tasks?',
         source: 'synthetic',
         mode: 'ASK',
         domain: 'ITEROP',
@@ -53,7 +52,7 @@ test('HTTP workflow isolates sessions, validates origins and preserves unknown A
       400,
     );
     assert.equal((await request('/apps/ITEROP/test', {})).status, 409);
-    assert.equal((await request('/apps/DATASET_CATALOG/test', {})).status, 409);
+    assert.equal((await request('/apps/DATASET_CATALOG/test', {})).status, 404);
     assert.equal((await request('/apps/UNKNOWN/test', {})).status, 404);
     await request('/session/clear', {});
     const b = benchmarks[0];

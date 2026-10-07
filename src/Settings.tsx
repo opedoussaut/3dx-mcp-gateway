@@ -17,7 +17,7 @@ import {
   ShieldCheck,
   Unplug,
 } from 'lucide-react';
-import type { AppDomain, AppStatus, RuntimeStatus, Source } from '../shared/types';
+import type { AppStatus, RuntimeStatus, Source } from '../shared/types';
 import { api } from './api';
 import { CopyButton, ErrorNote, Pill, Spinner } from './ui';
 
@@ -92,10 +92,7 @@ export function Connections({
         </button>
       </div>
       <section className="app-connections" aria-label="Application connections">
-        {status?.apps &&
-          (['ITEROP', 'DATASET_CATALOG'] as AppDomain[]).map((app) => (
-            <AppConnection key={app} status={status.apps[app]} />
-          ))}
+        {status?.apps && <AppConnection status={status.apps.ITEROP} />}
       </section>
       <h2 className="section-kicker">Engineering items</h2>
       <div className="connection-options">
@@ -400,10 +397,6 @@ export function Registry() {
   );
 }
 
-const serviceName: Record<AppDomain, string> = {
-  ITEROP: 'Operator diagnostic · ITEROP business process service',
-  DATASET_CATALOG: 'Operator diagnostic · dataset catalog service',
-};
 function AppConnection({ status }: { status: AppStatus }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -430,7 +423,10 @@ function AppConnection({ status }: { status: AppStatus }) {
       <header>
         <div>
           <h2>{status.label}</h2>
-          <small>{serviceName[status.app]}</small>
+          <small>
+            Operator diagnostic · ITEROP Business Process API v2 · documented in{' '}
+            {status.specRelease}
+          </small>
         </div>
         <Pill tone={status.liveReady ? 'green' : 'amber'}>
           {status.liveReady ? 'Live read admitted' : 'Live access blocked'}
@@ -452,8 +448,12 @@ function AppConnection({ status }: { status: AppStatus }) {
         <ul>
           {status.candidateOperations.map((o) => (
             <li key={o.name}>
-              <code>{o.name}</code>
-              <span>{o.description}</span>
+              <code>
+                {o.operationId} · {o.method} {o.path}
+              </code>
+              <span>
+                {o.name} — {o.description}
+              </span>
               <Pill tone={o.status === 'ADMITTED' ? 'green' : 'neutral'}>{o.status}</Pill>
             </li>
           ))}
@@ -467,7 +467,9 @@ function AppConnection({ status }: { status: AppStatus }) {
         >
           {busy ? <Spinner /> : <PlugZap size={16} />} Test {status.label} read
         </button>
-        <p>Runs the contract's single probe read. Disabled until the contract is admitted.</p>
+        <p>
+          Runs the contract's single probe read. Disabled until an approved contract is admitted.
+        </p>
       </div>
       {message && (
         <div className="success-note" role="status">
