@@ -143,11 +143,16 @@ export class Orchestrator {
     return id;
   }
 
-  async start(prompt: string, approval: 'each' | 'all' = 'each'): Promise<OrchestrationRun> {
+  async start(
+    prompt: string,
+    approval: 'each' | 'all' = 'each',
+    via: 'portal' | 'claude' = 'portal',
+  ): Promise<OrchestrationRun> {
     const run: OrchestrationRun = {
       id: randomUUID(),
       number: ++this.count,
       prompt,
+      via,
       createdAt: new Date().toISOString(),
       source: this.engine.source,
       intent: 'unknown',

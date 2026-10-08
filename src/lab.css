@@ -1260,3 +1260,46 @@
 .lab-explain-key {
   align-content: start;
 }
+
+/* Runs issued by Claude through MCP */
+.lab-via {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid #c9dcec;
+  background: #f0f6fb;
+  color: var(--nova-ink);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.lab-via svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--nova-blue);
+}
+.lab-via-tag {
+  margin-left: 6px;
+  font: 600 10.5px/1 var(--nova-mono);
+  font-style: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--nova-blue);
+  background: #e5f0f8;
+  border-radius: 6px;
+  padding: 2px 5px;
+  vertical-align: 1px;
+}
+.lab-arch {
+  display: block;
+  border: 1px solid var(--nova-hairline);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.lab-arch img {
+  display: block;
+  width: 100%;
+  height: auto;
+}

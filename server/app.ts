@@ -107,7 +107,7 @@ export function createApp(
     if (req.method !== 'GET') {
       if (
         req.headers.origin !== `http://${req.headers.host}` ||
-        req.headers['x-nova-client'] !== 'workspace' ||
+        !['workspace', 'mcp'].includes(String(req.headers['x-nova-client'])) ||
         !req.is('application/json')
       )
         return res.status(403).json({ error: 'ORIGIN_REJECTED' });
@@ -156,17 +156,21 @@ export function createApp(
   // ── Process orchestration lab. Synthetic engine by default; the live engine exists only when a
   // reviewed sandbox contract, gateway origin, API key and Openness Agent are configured. ──
   const liveEngine = createLiveEngine(labLive, labFetch);
+  // One sandbox identity, one operator: live runs are shared by the NOVA page and Claude (MCP),
+  // so a run Claude prepares can be reviewed and approved in the page. Simulated runs stay per session.
+  const liveOrchestrator = liveEngine && new Orchestrator(liveEngine);
   const lab = (session: Session) => {
     if (!session.lab) {
       const engine = new SyntheticEngine();
       session.lab = {
         engine,
         orchestrator: new Orchestrator(engine),
-        live: liveEngine && new Orchestrator(liveEngine),
+        live: liveOrchestrator,
       };
     }
     return session.lab;
   };
+  const fromClaude = (req: express.Request) => req.headers['x-nova-client'] === 'mcp';
   const labState = (l: Lab, source: 'synthetic' | 'live' = 'synthetic') => ({
     source,
     specRelease: SPEC.release,
@@ -207,7 +211,14 @@ export function createApp(
       });
     try {
       const orchestrator = source === 'live' ? l.live! : l.orchestrator;
-      const run = await orchestrator.start(parsed.data.prompt, parsed.data.approval);
+      // A Claude client never pre-approves sandbox writes: each one stops as a prepared request.
+      const claude = fromClaude(req);
+      const approval = claude && source === 'live' ? 'each' : parsed.data.approval;
+      const run = await orchestrator.start(
+        parsed.data.prompt,
+        approval,
+        claude ? 'claude' : 'portal',
+      );
       res.json({ run, state: labState(l, source) });
     } catch (e) {
       labError(res, e);
@@ -218,9 +229,24 @@ export function createApp(
     if (!parsed.success) return res.status(400).json({ error: 'Name the step to approve.' });
     const l = lab(res.locals.session as Session);
     const { orchestrator, source } = owner(l, req.params.id);
+    if (fromClaude(req) && source === 'live' && labLive.claudeApproval !== 'client')
+      return res.status(403).json({
+        error:
+          'Sandbox writes are approved by a person in NOVA, not by the Claude client. Open the run in NOVA and press Approve.',
+        approveIn: `/lab?source=live&run=${encodeURIComponent(req.params.id)}`,
+      });
     try {
       const run = await orchestrator.approve(req.params.id, parsed.data.stepId, parsed.data.all);
       res.json({ run, state: labState(l, source) });
+    } catch (e) {
+      labError(res, e);
+    }
+  });
+  app.get('/api/lab/runs/:id', (req, res) => {
+    const l = lab(res.locals.session as Session);
+    const { orchestrator, source } = owner(l, req.params.id);
+    try {
+      res.json({ run: orchestrator.find(req.params.id), state: labState(l, source) });
     } catch (e) {
       labError(res, e);
     }

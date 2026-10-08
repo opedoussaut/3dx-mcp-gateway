@@ -36,6 +36,7 @@ export type LabState = {
     ready: boolean;
     blockers: string[];
     drive: string[];
+    claudeApproval?: 'portal' | 'client';
     settings: {
       gateway: string | null;
       apiKey: boolean;

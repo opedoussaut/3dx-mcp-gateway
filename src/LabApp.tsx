@@ -7,6 +7,7 @@ import {
   Minus,
   Plug,
   ShieldCheck,
+  Sparkles,
   SquareTerminal,
   Waypoints,
 } from 'lucide-react';
@@ -40,9 +41,22 @@ const examples = [
   'What is the status?',
 ];
 
+// A link from Claude (MCP) opens the run it prepared: /lab?source=live&run=<id>.
+const linked = (() => {
+  try {
+    const q = new URLSearchParams(window.location.search);
+    return {
+      source: q.get('source') === 'live' ? ('live' as const) : ('synthetic' as const),
+      run: q.get('run'),
+    };
+  } catch {
+    return { source: 'synthetic' as const, run: null };
+  }
+})();
+
 export default function LabApp() {
   const [tab, setTab] = useState<'run' | 'explain'>('run');
-  const [source, setSource] = useState<'synthetic' | 'live'>('synthetic');
+  const [source, setSource] = useState<'synthetic' | 'live'>(linked.source);
   const [state, setState] = useState<LabState | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [prompt, setPrompt] = useState('');
@@ -55,9 +69,30 @@ export default function LabApp() {
     api<LabState>(`/lab?source=${source}`)
       .then((s) => {
         setState(s);
-        setActiveId(s.runs[0]?.id ?? null);
+        const wanted = linked.run && s.runs.find((r) => r.id === linked.run);
+        setActiveId(wanted ? wanted.id : (s.runs[0]?.id ?? null));
       })
       .catch(() => setError('The local NOVA server is not running. Start it with npm run dev.'));
+  }, [source]);
+  // Sandbox runs are shared with Claude: refresh so a run Claude prepares appears here to approve.
+  const busyRef = useRef(false);
+  busyRef.current = busy;
+  useEffect(() => {
+    if (source !== 'live') return;
+    const timer = setInterval(() => {
+      if (busyRef.current || document.hidden) return;
+      api<LabState>('/lab?source=live')
+        .then((s) => {
+          setState((old) => {
+            const known = new Set(old?.runs.map((r) => r.id));
+            const fresh = s.runs.find((r) => !known.has(r.id));
+            if (fresh) setActiveId(fresh.id);
+            return s;
+          });
+        })
+        .catch(() => undefined);
+    }, 4000);
+    return () => clearInterval(timer);
   }, [source]);
   const active = useMemo(
     () => state?.runs.find((r) => r.id === activeId) ?? null,
@@ -203,7 +238,7 @@ export default function LabApp() {
             <div className="lab-connection-foot">
               <p className="lab-fine">
                 {live
-                  ? 'Sandbox tenant through the API Gateway. Synthetic test processes only.'
+                  ? `Sandbox tenant through the API Gateway. Synthetic test processes only. Runs started from Claude appear here${state?.live.claudeApproval === 'client' ? '.' : ', and their writes wait for your approval on this page.'}`
                   : state?.live.ready
                     ? 'Simulated engine. Switch to Sandbox (live) to use your tenant.'
                     : 'Simulated engine, no platform request. Sandbox (live) unlocks when all four settings are green — restart the server after editing .env.'}
@@ -301,6 +336,18 @@ export default function LabApp() {
           </section>
           {error && <ErrorNote message={error} />}
 
+          {active?.via === 'claude' && (
+            <p className="lab-via" role="note">
+              <Sparkles size={15} aria-hidden="true" />
+              <span>
+                <strong>Requested by Claude</strong> through NOVA’s MCP connection: “{active.prompt}
+                ”.
+                {pending && active.source === 'live' && state?.live.claudeApproval !== 'client'
+                  ? ' Review the prepared write below — only your click sends it.'
+                  : ''}
+              </span>
+            </p>
+          )}
           {active && (
             <RunCard
               run={active}
@@ -337,7 +384,10 @@ export default function LabApp() {
                       onClick={() => setActiveId(r.id)}
                     >
                       <span className="lab-run-text">
-                        <strong>{r.identificator ?? `Run ${r.number}`}</strong>
+                        <strong>
+                          {r.identificator ?? `Run ${r.number}`}
+                          {r.via === 'claude' && <em className="lab-via-tag">Claude</em>}
+                        </strong>
                         <small>{r.prompt}</small>
                       </span>
                     </button>

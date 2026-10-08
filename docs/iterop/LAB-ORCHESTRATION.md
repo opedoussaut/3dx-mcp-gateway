@@ -65,6 +65,8 @@ They show how tools attach to process tasks. **They are not engineering values.*
 
 ## Use it
 
+**From your Claude account (Claude Desktop or Claude Code):** see [CLAUDE-MCP.md](CLAUDE-MCP.md). Claude understands the request and calls NOVA's lab tools. The runs are shared with the `/lab` page, and sandbox writes are approved there.
+
 **Standalone page:** run `npm run dev` and open <http://127.0.0.1:3000/lab> (*ITEROP orchestration lab*). It holds the connection status, the read-only connection test, one prompt box, the approval cards and the trace, and nothing else. It uses the same server, engines and approval gates as the portal's Orchestration view.
 
 The page has two tabs:
@@ -74,10 +76,10 @@ The page has two tabs:
 
 ```bash
 npm run dev            # http://127.0.0.1:3000 → Orchestration
-npm run mcp            # stdio MCP: lab_run_command, lab_approve_write, lab_cancel_run (synthetic only)
+npm run mcp            # stdio MCP for Claude clients: lab_* tools via the local NOVA server
 ```
 
-In an MCP client, set `lab_approve_write` to require your confirmation. That prompt is the approval step.
+In an MCP client on the simulated engine, set `lab_approve_write` to require your confirmation. That prompt is the approval step. Sandbox writes from Claude are approved in NOVA unless `NOVA_LAB_MCP_APPROVAL=client`.
 
 ## Importable test processes
 

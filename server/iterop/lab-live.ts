@@ -77,6 +77,11 @@ export type LabLiveConfig = {
   apiKey?: string;
   agent?: string;
   contract?: LabContract;
+  /**
+   * Where a Claude client (MCP) may approve sandbox writes: `portal` (default) means only a person
+   * clicking Approve in NOVA; `client` also accepts the MCP client's own tool-permission prompt.
+   */
+  claudeApproval: 'portal' | 'client';
   blockers: string[];
 };
 
@@ -135,13 +140,15 @@ export function loadLabLiveConfig(env: NodeJS.ProcessEnv = process.env): LabLive
       );
     }
   } else blockers.push('Install the reviewed lab contract (NOVA_LAB_CONTRACT_FILE).');
-  return { origin, playOrigin, apiKey, agent, contract, blockers };
+  const claudeApproval = v('MCP_APPROVAL') === 'client' ? 'client' : 'portal';
+  return { origin, playOrigin, apiKey, agent, contract, claudeApproval, blockers };
 }
 
 export const labLiveStatus = (c: LabLiveConfig) => ({
   ready: c.blockers.length === 0,
   blockers: c.blockers,
   drive: c.contract?.driveApproval.operations ?? [],
+  claudeApproval: c.claudeApproval,
   /** Presence only — never a key, secret or agent id. */
   settings: {
     gateway: c.origin ? new URL(c.origin).host : null,

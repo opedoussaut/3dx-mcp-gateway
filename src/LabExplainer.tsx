@@ -37,9 +37,9 @@ const flow = [
   },
   {
     icon: Route,
-    who: 'NOVA',
-    title: 'Plans the work',
-    text: 'Reads the process in ITEROP and lists the steps it will take, in order.',
+    who: 'Claude + NOVA',
+    title: 'Understands and plans',
+    text: 'Claude understands the request; NOVA reads the process in ITEROP and lays out the steps.',
   },
   {
     icon: Calculator,
@@ -69,8 +69,8 @@ const roles = [
   },
   {
     icon: Workflow,
-    name: 'NOVA — the orchestrator',
-    text: 'Turns the request into process steps, runs the tools, keeps the trace.',
+    name: 'Claude + NOVA — the orchestrator',
+    text: 'Claude, signed in with your own account, understands the request. NOVA turns it into process steps, runs the tools, enforces the rules and keeps the trace.',
   },
   {
     icon: ClipboardCheck,
@@ -121,12 +121,12 @@ const security: { icon: typeof Lock; title: string; text: string }[] = [
   {
     icon: ShieldCheck,
     title: 'Rules sit outside the AI',
-    text: 'What NOVA is allowed to do is decided by fixed server rules and a reviewed lab contract, not by the wording of a request. A cleverly phrased prompt cannot widen its access.',
+    text: 'What NOVA is allowed to do is decided by fixed server rules and a reviewed lab contract, not by Claude or the wording of a request. Claude chooses among NOVA’s actions; it cannot add new ones, pick the engine or approve sandbox writes.',
   },
   {
     icon: FileLock2,
     title: 'Secrets stay on this computer',
-    text: 'The API key and agent secret live in a local file that is never published, never sent to the browser and never pasted in a chat. This page only shows whether each one is set.',
+    text: 'The API key and agent secret live in a local file that is never published, never sent to the browser or to Claude, and never pasted in a chat. This page only shows whether each one is set.',
   },
   {
     icon: ServerCog,
@@ -169,8 +169,12 @@ const proven: { done: boolean; text: string }[] = [
     text: 'Next: complete all steps of a live run and have an engineer sign it in ITEROP',
   },
   {
+    done: true,
+    text: 'Claude connected through MCP: it reads and prepares sandbox work, while each write still waits for a person in NOVA (tested against a gateway simulation)',
+  },
+  {
     done: false,
-    text: 'Next: let Claude drive the same, approval-gated actions directly (already available on the simulated engine)',
+    text: 'Next: the first live run driven from Claude Desktop, signed off in ITEROP',
   },
 ];
 
@@ -224,6 +228,21 @@ export default function LabExplainer({ tryIt }: { tryIt: () => void }) {
         </p>
       </section>
 
+      <section className="lab-card" aria-labelledby="ex-arch">
+        <h2 id="ex-arch" className="lab-explain-h">
+          Architecture at a glance
+        </h2>
+        <a className="lab-arch" href="/architecture.svg" target="_blank" rel="noreferrer">
+          <img
+            src="/architecture.svg"
+            width={1200}
+            height={720}
+            alt="Claude, signed in with your account, calls NOVA's MCP server. It calls the local NOVA server, which plans the steps, applies the rules and holds every write for your approval. NOVA reaches the sandbox ITEROP through the API Gateway with an API key and its own robot account; an engineer signs off in ITEROP Play. Signing, reassigning, stopping, deleting, deploying and changing rights are never possible."
+          />
+        </a>
+        <p className="lab-fine">Open the diagram full size in a new tab.</p>
+      </section>
+
       <section className="lab-card" aria-labelledby="ex-roles">
         <h2 id="ex-roles" className="lab-explain-h">
           Who does what
@@ -265,6 +284,38 @@ export default function LabExplainer({ tryIt }: { tryIt: () => void }) {
             </ul>
           </div>
         </div>
+      </section>
+
+      <section className="lab-card" aria-labelledby="ex-claude">
+        <h2 id="ex-claude" className="lab-explain-h">
+          Where Claude fits
+        </h2>
+        <p className="lab-explain-lead">
+          You talk to Claude with your own Claude account (for example Claude Desktop). NOVA plugs
+          into Claude as a connector (MCP) and gives it a small set of process actions: list
+          processes and tasks, configure the cooling chain, change an input, continue a run, handle
+          rework. Claude decides which action answers your request and explains the result in plain
+          language.
+        </p>
+        <ul className="lab-roles">
+          <li>
+            <MessageSquareText size={18} aria-hidden="true" />
+            <strong>Claude brings the intelligence</strong>
+            <span>
+              It understands free-form requests in any language, asks for missing values, chains
+              several actions and summarises what happened.
+            </span>
+          </li>
+          <li>
+            <ShieldCheck size={18} aria-hidden="true" />
+            <strong>NOVA keeps control</strong>
+            <span>
+              Claude can only use NOVA’s actions. Each write stops as “prepared”; by default it is
+              approved by a person on this page, never by Claude. The run appears here with a link
+              Claude gives you.
+            </span>
+          </li>
+        </ul>
       </section>
 
       <section className="lab-card" aria-labelledby="ex-secure">
@@ -317,8 +368,9 @@ export default function LabExplainer({ tryIt }: { tryIt: () => void }) {
           ))}
         </ul>
         <p className="lab-fine">
-          Status as of 8 October 2026. Today NOVA understands requests with fixed, auditable rules,
-          so the same request always produces the same plan.
+          Status as of 8 October 2026. Typed directly on this page, requests are read by fixed,
+          auditable rules. Through Claude, the language understanding is Claude’s; the actions it
+          can take, and the approvals, stay NOVA’s.
         </p>
       </section>
 

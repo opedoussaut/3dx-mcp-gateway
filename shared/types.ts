@@ -223,6 +223,8 @@ export type OrchestrationRun = {
   id: string;
   number: number;
   prompt: string;
+  /** Who issued the command: the NOVA page, or Claude through the MCP server. */
+  via?: 'portal' | 'claude';
   createdAt: string;
   source: Source;
   intent:
