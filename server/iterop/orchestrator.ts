@@ -396,36 +396,96 @@ export class Orchestrator {
         const info = (await this.engine.getTaskInstanceInformations(c.taskId!)) as {
           providedData?: Variable[];
         };
-        const v = (id: string) => info.providedData?.find((x) => x.id === id)?.value;
-        step.response = { providedData: (info.providedData ?? []).map((x) => x.id) };
-        const load = Number(v('start_itLoadKw'));
-        const water = Number(v('start_facilityWaterC'));
-        const racks = Number(v('start_rackCount'));
-        if (![load, water, racks].every(Number.isFinite)) {
+        let values = new Map<string, unknown>(
+          (info.providedData ?? []).map((x) => [x.id, x.value] as [string, unknown]),
+        );
+        let origin = 'the task';
+        const num = (id: string) => Number(values.get(id));
+        const readable = () =>
+          ['start_itLoadKw', 'start_facilityWaterC', 'start_rackCount'].every((id) =>
+            Number.isFinite(num(id)),
+          );
+        if (!readable() && c.instanceId) {
+          // The run's own data, when this account may read it (supervisor of its own runs).
+          try {
+            const inst = (await this.engine.getInstanceInfo(c.instanceId)) as {
+              variables?: Variable[];
+            };
+            values = new Map(
+              (inst.variables ?? []).map((x) => [x.id, x.value] as [string, unknown]),
+            );
+            origin = 'the process instance';
+          } catch {
+            /* not readable by this account: try the next source */
+          }
+        }
+        let inputs: ChainInputs | undefined;
+        if (readable())
+          inputs = {
+            itLoadKw: num('start_itLoadKw'),
+            facilityWaterC: num('start_facilityWaterC'),
+            rackCount: num('start_rackCount'),
+            redundancy: String(
+              values.get('start_redundancy') ?? 'N+1',
+            ) as ChainInputs['redundancy'],
+            coolant: String(values.get('start_coolant') ?? 'auto') as ChainInputs['coolant'],
+          };
+        const earlier = this.runs.find(
+          (r) => r !== run && r.identificator === c.identificator && r.inputs,
+        );
+        if (!inputs && earlier) {
+          inputs = earlier.inputs as unknown as ChainInputs;
+          origin = `run ${earlier.number} of this session`;
+        }
+        const stated = parseInputs(run.prompt);
+        if (
+          !inputs &&
+          stated.itLoadKw !== undefined &&
+          stated.facilityWaterC !== undefined &&
+          stated.rackCount !== undefined
+        ) {
+          inputs = {
+            itLoadKw: stated.itLoadKw,
+            facilityWaterC: stated.facilityWaterC,
+            rackCount: stated.rackCount,
+            redundancy: stated.redundancy ?? 'N+1',
+            coolant: stated.coolant ?? 'auto',
+          };
+          origin = 'your command';
+        }
+        step.response = { providedData: [...values.keys()], source: origin };
+        if (!inputs) {
           run.status = 'needs_input';
-          run.summary = `${c.identificator}: the start values are not readable from the task, so NOVA cannot continue it safely.`;
+          run.missing = [
+            'the run’s start values, e.g. “Continue COOL-001 with 1.2 MW, 32 °C facility water, 16 racks, N+1”',
+          ];
+          run.summary = `${c.identificator}: the start values are not readable by NOVA’s account (the task shows no data and the instance is not readable). Repeat the values in the command, or show the start fields under the task’s “Information to display”.`;
           throw new Stop();
         }
-        c.inputs = {
-          itLoadKw: load,
-          facilityWaterC: water,
-          rackCount: racks,
-          redundancy: String(v('start_redundancy') ?? 'N+1') as ChainInputs['redundancy'],
-          coolant: String(v('start_coolant') ?? 'auto') as ChainInputs['coolant'],
-        };
+        c.inputs = inputs;
+        if (origin !== 'the task' && origin !== 'the process instance')
+          run.findings.push(
+            `Start values taken from ${origin}; they are not readable from the process by NOVA’s account.`,
+          );
         // Earlier task outputs feed the later tools (e.g. the loop needs the coolant properties).
         for (const f of auto.flatMap((a) => a.expectedFields)) {
-          const value = v(f.id);
-          if (
-            value !== undefined &&
-            value !== null &&
-            (typeof value === 'string' || typeof value === 'number')
-          )
-            c.outputs[f.id] = value;
+          const value = values.get(f.id);
+          if (typeof value === 'string' || typeof value === 'number') c.outputs[f.id] = value;
         }
+        // Missing ones are recomputed: the lab tools are deterministic functions of the inputs.
+        const current = run.steps.find(
+          (st) => st.status === 'pending' && st.kind === 'compute',
+        )?.stage;
+        const upTo = Math.max(
+          0,
+          auto.findIndex((x) => x.id === current),
+        );
+        for (const a of auto.slice(0, upTo))
+          if (a.expectedFields.some((f) => c.outputs[f.id] === undefined))
+            Object.assign(c.outputs, runTool(a.tool!, c));
         run.inputs = { ...c.inputs };
         run.stageNotes.start = `${fmt(c.inputs.itLoadKw, 'kW')} · ${c.inputs.facilityWaterC} °C · ${c.inputs.rackCount} racks · ${c.inputs.redundancy}`;
-        step.outcome = '200 · start values read';
+        step.outcome = `200 · start values from ${origin}`;
       },
     );
     return [find, inputs, ...this.automatedTasks(def, ctx), ...this.handOff(def, ctx)];

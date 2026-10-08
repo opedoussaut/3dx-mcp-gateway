@@ -444,3 +444,40 @@ test('a stopped run is continued from the task it waits at, with the values alre
   assert.equal(none.status, 'completed');
   assert.match(none.summary, /no open task/);
 });
+
+test('continuing a run whose values are not readable uses the values given in the command', async () => {
+  const { engine, o } = lab();
+  let run = await o.start(CONFIGURE);
+  run = await o.approve(run.id, run.steps.find((s) => s.status === 'awaiting_approval')!.id);
+  o.cancel(run.id);
+  // Simulate a run-only account: the task exposes no data and the instance is not readable.
+  const original = engine.getTaskInstanceInformations.bind(engine);
+  engine.getTaskInstanceInformations = (id: string) => ({ ...original(id), providedData: [] });
+  engine.getInstanceInfo = () => {
+    throw new EngineError(403, 'User not authorized.');
+  };
+  // A fresh orchestrator: no earlier run of this session to fall back on.
+  const fresh = new Orchestrator(engine);
+  const blocked = await fresh.start('Continue COOL-001', 'all');
+  assert.equal(blocked.status, 'needs_input');
+  assert.match(blocked.missing[0], /Continue COOL-001 with/);
+  const resumed = await fresh.start(
+    'Continue COOL-001 with 1.2 MW, 32 °C facility water, 16 racks, N+1',
+    'all',
+  );
+  assert.equal(resumed.status, 'awaiting_signoff', resumed.summary);
+  assert.match(resumed.findings.join(' '), /taken from your command/);
+  // The same orchestrator remembers its own run's inputs.
+  const { engine: e2, o: o2 } = lab();
+  let r2 = await o2.start(CONFIGURE);
+  r2 = await o2.approve(r2.id, r2.steps.find((s) => s.status === 'awaiting_approval')!.id);
+  o2.cancel(r2.id);
+  const orig2 = e2.getTaskInstanceInformations.bind(e2);
+  e2.getTaskInstanceInformations = (id: string) => ({ ...orig2(id), providedData: [] });
+  e2.getInstanceInfo = () => {
+    throw new EngineError(403, 'no');
+  };
+  const again = await o2.start('Continue COOL-001', 'all');
+  assert.equal(again.status, 'awaiting_signoff', again.summary);
+  assert.match(again.findings.join(' '), /taken from run 1 of this session/);
+});
