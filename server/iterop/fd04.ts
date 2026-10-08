@@ -12,43 +12,43 @@ const int = z.number().int();
 
 /** components.schemas.GetAllStartableProcessesInfo */
 export const startableProcessInfo = z.looseObject({
-  key: z.string().optional(),
-  name: z.string().optional(),
-  version: int.optional(),
+  key: z.string().nullish(),
+  name: z.string().nullish(),
+  version: int.nullish(),
 });
 /** components.schemas.GetAllStartableProcessesInfoList — 200 of getAllStartableProcesses */
 export const startableProcessesList = z.looseObject({
-  responses: z.array(startableProcessInfo).optional(),
+  responses: z.array(startableProcessInfo).nullish(),
 });
 
 /** components.schemas.ProcessInstanceInformation */
 export const processInstanceInformation = z.looseObject({
-  identificator: z.string().optional(),
-  instanceId: z.string().optional(),
-  name: z.string().optional(),
+  identificator: z.string().nullish(),
+  instanceId: z.string().nullish(),
+  name: z.string().nullish(),
 });
 /** components.schemas.GetTaskInstanceBasicResponse — items of the 200 array of getTasksByUser */
 export const taskInstanceBasic = z.looseObject({
-  id: z.string().optional(),
-  name: z.string().optional(),
-  description: z.string().optional(),
-  priority: int.optional(),
-  startDate: int.optional(),
-  process: processInstanceInformation.optional(),
+  id: z.string().nullish(),
+  name: z.string().nullish(),
+  description: z.string().nullish(),
+  priority: int.nullish(),
+  startDate: int.nullish(),
+  process: processInstanceInformation.nullish(),
 });
 export const tasksByUser = z.array(taskInstanceBasic);
 
 /** components.schemas.GetBasicProcessInfoResponse — 200 of getBasicProcessInfo */
 export const basicProcessInfo = z.looseObject({
-  key: z.string().optional(),
-  name: z.string().optional(),
-  description: z.string().optional(),
-  version: int.optional(),
-  icon: z.string().optional(),
+  key: z.string().nullish(),
+  name: z.string().nullish(),
+  description: z.string().nullish(),
+  version: int.nullish(),
+  icon: z.string().nullish(),
 });
 
 /** Documented error body for HTTP status >= 400 (info.description, "Errors"). */
-export const errorBody = z.looseObject({ code: int.optional(), message: z.string().optional() });
+export const errorBody = z.looseObject({ code: int.nullish(), message: z.string().nullish() });
 
 export type StartableProcessesList = z.infer<typeof startableProcessesList>;
 export type TaskInstanceBasic = z.infer<typeof taskInstanceBasic>;

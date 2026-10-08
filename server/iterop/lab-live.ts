@@ -252,8 +252,17 @@ async function readBounded(response: Response) {
 
 const check = <T>(schema: z.ZodType<T>, body: unknown, op: string): T => {
   const parsed = schema.safeParse(body);
-  if (!parsed.success)
-    throw new EngineError(502, `The response does not match the ${op} schema (R2026x-FD04).`);
+  if (!parsed.success) {
+    // Name the offending properties (paths and expected types only, never values).
+    const where = parsed.error.issues
+      .slice(0, 3)
+      .map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
+      .join('; ');
+    throw new EngineError(
+      502,
+      `The response does not match the ${op} schema (R2026x-FD04) at ${where}.`,
+    );
+  }
   return parsed.data;
 };
 
@@ -397,7 +406,7 @@ export class LiveEngine implements ProcessEngine {
     const m = await this.variableMap();
     return { source: m.source, start: [...m.toTenant] };
   }
-  private async labIds<T extends { id?: string }>(items: T[] | undefined) {
+  private async labIds<T extends { id?: string | null }>(items: T[] | null | undefined) {
     const { toLab } = await this.variableMap();
     const labs = definitions.filter((d) => this.admits(d.key)).flatMap(allLabFields);
     return items?.map((i) => ({

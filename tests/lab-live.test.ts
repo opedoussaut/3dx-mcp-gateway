@@ -352,6 +352,45 @@ test('a run-only account (definition 403) still starts, completes and passes the
   );
 });
 
+test('real task bodies with null form properties are accepted; mismatches name the path', async () => {
+  const engine = createLiveEngine(config(), async () =>
+    json({
+      id: 'T1',
+      name: 'Select coolant',
+      description: null,
+      priority: null,
+      startDate: 1791443470000,
+      providedData: [
+        { id: 'operatingEnvelope_startItloadkw', name: 'IT load', type: 'DECIMAL', value: 1200 },
+      ],
+      expectedFields: [
+        {
+          id: 'x_coolantselectionFluid',
+          name: 'coolantSelection_fluid',
+          type: 'TEXT',
+          required: true,
+          values: null,
+          defaultValue: null,
+          min: null,
+          max: 255,
+          regex: null,
+          composedVariableDefinition: null,
+        },
+      ],
+      process: { identificator: 'COOL-001', instanceId: '9206643306167484571', name: 'NOVA lab' },
+      assignments: null,
+    }),
+  )!;
+  const info = await engine.getTaskInstanceInformations('T1');
+  assert.equal(info.expectedFields?.[0].id, 'coolantSelection_fluid');
+  assert.equal(info.providedData?.[0].id, 'start_itLoadKw');
+  const bad = createLiveEngine(config(), async () => json({ id: 'T1', expectedFields: 'nope' }))!;
+  await assert.rejects(
+    Promise.resolve(bad.getTaskInstanceInformations('T1')),
+    /getTaskInstanceInformations schema \(R2026x-FD04\) at expectedFields:/,
+  );
+});
+
 test('a task outside the lab processes cannot be completed', async () => {
   const fetcher: typeof fetch = async (input, init) =>
     init?.method === 'GET'

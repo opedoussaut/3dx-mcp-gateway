@@ -137,53 +137,53 @@ const variableType = z.enum([
 ]);
 /** components.schemas.VariableValue */
 export const variableValue = z.looseObject({
-  id: z.string().optional(),
-  name: z.string().optional(),
-  type: variableType.optional(),
-  value: z.unknown().optional(),
+  id: z.string().nullish(),
+  name: z.string().nullish(),
+  type: z.string().nullish(),
+  value: z.unknown().nullish(),
 });
 /** components.schemas.VariableDefinition (the properties the lab uses) */
 export const variableDefinition = z.looseObject({
-  id: z.string().optional(),
-  name: z.string().optional(),
-  description: z.string().optional(),
-  type: variableType.optional(),
-  parameter: z.boolean().optional(),
-  required: z.boolean().optional(),
-  values: z.string().optional(),
-  defaultValue: z.string().optional(),
-  min: z.string().optional(),
-  max: z.string().optional(),
+  id: z.string().nullish(),
+  name: z.string().nullish(),
+  description: z.string().nullish(),
+  type: z.string().nullish(),
+  parameter: z.boolean().nullish(),
+  required: z.union([z.boolean(), z.string()]).nullish(),
+  values: z.string().nullish(),
+  defaultValue: z.union([z.string(), z.number(), z.boolean()]).nullish(),
+  min: z.union([z.string(), z.number()]).nullish(),
+  max: z.union([z.string(), z.number()]).nullish(),
 });
 /** components.schemas.GetTaskInstanceResponse */
 export const taskInstanceResponse = z.looseObject({
-  id: z.string().optional(),
-  name: z.string().optional(),
-  description: z.string().optional(),
-  priority: int.optional(),
-  startDate: int.optional(),
-  providedData: z.array(variableValue).optional(),
-  expectedFields: z.array(variableDefinition).optional(),
+  id: z.string().nullish(),
+  name: z.string().nullish(),
+  description: z.string().nullish(),
+  priority: int.nullish(),
+  startDate: int.nullish(),
+  providedData: z.array(variableValue).nullish(),
+  expectedFields: z.array(variableDefinition).nullish(),
 });
 /** components.schemas.GetProcessInfoResponse (the properties the lab uses) */
 export const processInfoResponse = z.looseObject({
-  key: z.string().optional(),
-  name: z.string().optional(),
-  version: int.optional(),
+  key: z.string().nullish(),
+  name: z.string().nullish(),
+  version: int.nullish(),
   humanTasks: z
     .array(
       z.looseObject({
-        id: z.string().optional(),
-        name: z.string().optional(),
-        outputs: z.array(z.looseObject({ id: z.string().optional() })).optional(),
+        id: z.string().nullish(),
+        name: z.string().nullish(),
+        outputs: z.array(z.looseObject({ id: z.string().nullish() })).nullish(),
       }),
     )
-    .optional(),
-  variables: z.record(z.string(), variableDefinition).optional(),
+    .nullish(),
+  variables: z.record(z.string(), variableDefinition).nullish(),
 });
 /** components.schemas.GetInstanceInfoResponse */
 export const instanceInfoResponse = z.looseObject({
-  id: z.string().optional(),
-  identificator: z.string().optional(),
-  variables: z.array(variableValue).optional(),
+  id: z.string().nullish(),
+  identificator: z.string().nullish(),
+  variables: z.array(variableValue).nullish(),
 });

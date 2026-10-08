@@ -22,6 +22,7 @@ const examples = [
   'Which processes can I start?',
   'What tasks are waiting for me?',
   'Configure the cooling chain for 1.2 MW IT load, 32 °C facility water, 16 racks, N+1',
+  'Continue COOL-001',
   'Check my inbox and handle any rework',
   'Facility water is now 38 °C — what needs to be recalculated?',
   'What is the status?',

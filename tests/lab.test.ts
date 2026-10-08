@@ -193,7 +193,10 @@ test('a reviewer rejection comes back to the inbox and NOVA reruns the chain', a
 test('a what-if reruns from the previous inputs and reports what changed', async () => {
   const { o } = lab();
   await approveAll(o, await o.start(CONFIGURE));
-  const whatIf = await o.start('Facility water is now 38 °C — what needs to be recalculated?', 'all');
+  const whatIf = await o.start(
+    'Facility water is now 38 °C — what needs to be recalculated?',
+    'all',
+  );
   assert.equal(whatIf.intent, 'recalculate');
   assert.match(whatIf.findings.join(' '), /facility water 32 → 38\. Affected stages: loop, check/);
   const changed = Object.fromEntries(
@@ -222,7 +225,9 @@ test('refusals, missing inputs and reads plan no write', async () => {
   const missing = await o.start('Configure the cooling chain for 900 kW');
   assert.equal(missing.status, 'needs_input');
   assert.equal(missing.missing.length, 2);
-  const range = await o.start('Configure the cooling chain for 30 kW, 30 °C facility water, 4 racks');
+  const range = await o.start(
+    'Configure the cooling chain for 30 kW, 30 °C facility water, 4 racks',
+  );
   assert.equal(range.status, 'needs_input');
   const noSource = await o.start('Register a candidate requirement: supply must stay below 40 °C');
   assert.equal(noSource.status, 'needs_input');
@@ -412,4 +417,30 @@ test('HTTP lab API runs synthetic only and refuses live process control', async 
   } finally {
     server.close();
   }
+});
+
+test('a stopped run is continued from the task it waits at, with the values already entered', async () => {
+  const { engine, o } = lab();
+  let run = await o.start(CONFIGURE);
+  // Approve the start and the first completion, then stop before the second.
+  run = await o.approve(run.id, run.steps.find((s) => s.status === 'awaiting_approval')!.id);
+  run = await o.approve(run.id, run.steps.find((s) => s.status === 'awaiting_approval')!.id);
+  o.cancel(run.id);
+  assert.equal(engine.getTasksByUser()[0].name, 'Size coolant distribution units');
+  const resumed = await o.start('Continue COOL-001', 'all');
+  assert.equal(resumed.status, 'awaiting_signoff', resumed.summary);
+  assert.equal(resumed.identificator, 'COOL-001');
+  assert.equal(resumed.stageNotes.coolantSelection, 'done earlier');
+  // The coolant chosen in the first run (PG25 properties) fed the loop calculation.
+  assert.equal(
+    resumed.outputs.find((x) => x.field === 'loopConfiguration_flowLpm')?.value,
+    '1,796 L/min',
+  );
+  const completes = resumed.steps.filter(
+    (s) => s.operationId === 'completeTask' && s.status === 'done',
+  );
+  assert.equal(completes.length, 3);
+  const none = await o.start('Continue COOL-001', 'all');
+  assert.equal(none.status, 'completed');
+  assert.match(none.summary, /no open task/);
 });

@@ -7,6 +7,13 @@ import { project, syntheticResponse } from '../server/iterop/connector';
 import { operations, SPEC } from '../server/iterop/operations';
 import { loadSpec, propertyNames } from '../scripts/openapi-lib';
 
+type Wrapped = { unwrap?: () => Wrapped; element?: { shape: object } };
+/** Peel nullable/optional wrappers down to the array schema. */
+const unwrapArray = (w: Wrapped): { element: { shape: object } } => {
+  let cur = w;
+  while (!cur.element && cur.unwrap) cur = cur.unwrap();
+  return cur as { element: { shape: object } };
+};
 const synthetic = () =>
   operations.map((op) => ({
     op,
@@ -104,11 +111,11 @@ test(
           : ok;
       const zodShape = (
         op.rows.kind === 'property'
-          ? (
-              op.response as unknown as {
-                shape: Record<string, { unwrap(): { element: { shape: object } } }>;
-              }
-            ).shape[op.rows.property].unwrap().element.shape
+          ? unwrapArray(
+              (op.response as unknown as { shape: Record<string, Wrapped> }).shape[
+                op.rows.property
+              ],
+            ).element.shape
           : op.rows.kind === 'array'
             ? (op.response as unknown as { element: { shape: object } }).element.shape
             : (op.response as unknown as { shape: object }).shape

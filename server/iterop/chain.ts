@@ -237,10 +237,10 @@ export const definition = (key: string) => definitions.find((d) => d.key === key
  * Task names as the platform may show them: an imported BPMN lane can prefix the name
  * ("[Operator (NOVA acts as you)] Select coolant"). Compare without that prefix and case.
  */
-export const taskName = (name: string | undefined) =>
+export const taskName = (name: string | null | undefined) =>
   (name ?? '')
     .replace(/^\s*\[[^\]]*\]\s*/, '')
     .trim()
     .toLowerCase();
-export const sameTask = (a: string | undefined, b: string | undefined) =>
+export const sameTask = (a: string | null | undefined, b: string | null | undefined) =>
   taskName(a) !== '' && taskName(a) === taskName(b);

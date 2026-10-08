@@ -216,6 +216,8 @@ export class Orchestrator {
     const previous = this.runs.find(
       (r) => r !== run && r.inputs && r.processKey === COOLING_CHAIN && r.status !== 'needs_input',
     );
+    if (/\b(continue|resume|reprend\w*|finish|pick up where)\b/i.test(prompt))
+      return this.planResume(run, ctx, prompt.match(/\b(COOL-\d+)\b/i)?.[1]);
     if (/\b(requirement|exigence)\b/i.test(prompt)) return this.planRequirement(run, ctx);
     if (
       previous &&
@@ -320,6 +322,113 @@ export class Orchestrator {
       ...this.automatedTasks(def, ctx),
       ...this.handOff(def, ctx, previous),
     ];
+  }
+
+  /**
+   * Pick up a cooling-chain run that is waiting at one of NOVA's tasks (for example after a
+   * stopped run), read the values already in the process and continue from that task.
+   */
+  private planResume(run: OrchestrationRun, ctx: Ctx, identificator?: string): Planned[] {
+    const def = definition(COOLING_CHAIN)!;
+    const auto = def.tasks.filter((t) => t.tool);
+    run.intent = 'configure';
+    run.processKey = def.key;
+    run.processName = def.name;
+    run.stages = chainStages(def);
+    for (const st of run.stages) run.stageState[st.id] = 'pending';
+    ctx.def = def;
+    const find = read(
+      'getTasksByUser',
+      identificator
+        ? `Find the open task of ${identificator.toUpperCase()}`
+        : 'Find a waiting chain task',
+      {},
+      async (c, step) => {
+        const tasks = (await this.engine.getTasksByUser()) as Task[];
+        const open = tasks.filter(
+          (t) =>
+            auto.some((a) => sameTask(t.name, a.name)) &&
+            (!identificator ||
+              t.process?.identificator?.toUpperCase() === identificator.toUpperCase()),
+        );
+        step.response = open;
+        if (!open.length) {
+          step.outcome = `200 · ${tasks.length} task${tasks.length === 1 ? '' : 's'}, none to continue`;
+          run.summary = identificator
+            ? `${identificator.toUpperCase()} has no open task assigned to NOVA's account.`
+            : 'No cooling-chain run is waiting at one of NOVA’s tasks.';
+          throw new Stop();
+        }
+        const t = open[0];
+        const index = auto.findIndex((a) => sameTask(t.name, a.name));
+        step.outcome = `200 · ${t.process?.identificator ?? t.id} waiting at “${auto[index].name}”`;
+        c.taskId = t.id;
+        c.instanceId = t.process?.instanceId;
+        c.identificator = t.process?.identificator;
+        run.identificator = c.identificator;
+        run.instanceId = c.instanceId;
+        run.stageState.start = 'done';
+        // Tasks before this one are already done in the process: skip their steps.
+        for (const done of auto.slice(0, index)) {
+          run.stageState[done.id] = 'done';
+          run.stageNotes[done.id] = 'done earlier';
+        }
+        const skip = new Set(auto.slice(0, index).map((a) => a.id));
+        for (const s of run.steps)
+          if (
+            s.status === 'pending' &&
+            s.stage &&
+            (skip.has(s.stage) ||
+              (s.stage === auto[index].id && s.operationId === 'getTasksByUser'))
+          )
+            s.status = 'skipped';
+        if (open.length > 1)
+          run.findings.push(
+            `${open.length} runs are waiting; continuing ${c.identificator}. Name one (e.g. “continue COOL-002”) to choose.`,
+          );
+      },
+    );
+    const inputs = read(
+      'getTaskInstanceInformations',
+      'Read the values already in the process',
+      {},
+      async (c, step) => {
+        const info = (await this.engine.getTaskInstanceInformations(c.taskId!)) as {
+          providedData?: Variable[];
+        };
+        const v = (id: string) => info.providedData?.find((x) => x.id === id)?.value;
+        step.response = { providedData: (info.providedData ?? []).map((x) => x.id) };
+        const load = Number(v('start_itLoadKw'));
+        const water = Number(v('start_facilityWaterC'));
+        const racks = Number(v('start_rackCount'));
+        if (![load, water, racks].every(Number.isFinite)) {
+          run.status = 'needs_input';
+          run.summary = `${c.identificator}: the start values are not readable from the task, so NOVA cannot continue it safely.`;
+          throw new Stop();
+        }
+        c.inputs = {
+          itLoadKw: load,
+          facilityWaterC: water,
+          rackCount: racks,
+          redundancy: String(v('start_redundancy') ?? 'N+1') as ChainInputs['redundancy'],
+          coolant: String(v('start_coolant') ?? 'auto') as ChainInputs['coolant'],
+        };
+        // Earlier task outputs feed the later tools (e.g. the loop needs the coolant properties).
+        for (const f of auto.flatMap((a) => a.expectedFields)) {
+          const value = v(f.id);
+          if (
+            value !== undefined &&
+            value !== null &&
+            (typeof value === 'string' || typeof value === 'number')
+          )
+            c.outputs[f.id] = value;
+        }
+        run.inputs = { ...c.inputs };
+        run.stageNotes.start = `${fmt(c.inputs.itLoadKw, 'kW')} · ${c.inputs.facilityWaterC} °C · ${c.inputs.rackCount} racks · ${c.inputs.redundancy}`;
+        step.outcome = '200 · start values read';
+      },
+    );
+    return [find, inputs, ...this.automatedTasks(def, ctx), ...this.handOff(def, ctx)];
   }
 
   private planInbox(run: OrchestrationRun, ctx: Ctx): Planned[] {
