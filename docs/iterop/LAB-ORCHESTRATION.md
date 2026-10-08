@@ -95,7 +95,10 @@ Import: process list → **Import model** → choose the `.bpmn` file. BPMN carr
 
 Assign the automated tasks and the rework task to the operator identity NOVA will use. Assign the signature tasks to a **different** person. The gateway routes on `engineeringSignoff_decision`. The designer may ask you to re-enter the condition expressions in its own syntax.
 
-The BPMN import has not yet been tried on a tenant. Expect to adjust the forms and the gateway after import.
+**Import result on the sandbox (8 October 2026).** Both files import successfully, with non-critical warnings only:
+
+- _"no assignment defined for the task …"_ for every task. Expected: assignments are configured in the designer, not carried by standard BPMN.
+- _"variable 'identificatorInstance' not found"_. The designer adds an instance-identificator variable to the start form automatically. NOVA sets the identificator through the `identificator` property of `startProcess` (`COOL-nnn`, `REQ-nnn`). The first live test must confirm that this property fills that variable, because NOVA relies on it to find the new instance.
 
 ## Going live on a sandbox tenant
 
