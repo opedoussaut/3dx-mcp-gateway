@@ -67,6 +67,11 @@ They show how tools attach to process tasks. **They are not engineering values.*
 
 **Standalone page:** run `npm run dev` and open <http://127.0.0.1:3000/lab> (*ITEROP orchestration lab*). It holds the connection status, the read-only connection test, one prompt box, the approval cards and the trace, and nothing else. It uses the same server, engines and approval gates as the portal's Orchestration view.
 
+The page has two tabs:
+
+- **Run** holds the controls.
+- **How it works** explains the lab for non-specialists. It covers the request flow, who does what, what NOVA can and can never do, why it is secure, and what has been proven (`src/LabExplainer.tsx`; screenshots `docs/screenshots/lab-how-it-works-*.png`). That copy is static, so update it whenever the control boundary or the proven status changes.
+
 ```bash
 npm run dev            # http://127.0.0.1:3000 → Orchestration
 npm run mcp            # stdio MCP: lab_run_command, lab_approve_write, lab_cancel_run (synthetic only)

@@ -30,3 +30,17 @@ test('the standalone lab page reads and drives the simulated engine with approva
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(external).toEqual([]);
 });
+
+test('the lab explains what is implemented, its limits and why it is secure', async ({ page }) => {
+  await page.goto('/lab');
+  await page.getByRole('tab', { name: 'How it works' }).click();
+  const panel = page.getByRole('tabpanel', { name: 'How it works' });
+  await expect(panel.getByRole('heading', { name: 'How a request flows' })).toBeVisible();
+  await expect(panel.getByRole('heading', { name: 'Why it is secure' })).toBeVisible();
+  await expect(panel.getByText('Sign or approve on an engineer’s behalf')).toBeVisible();
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.getByRole('button', { name: 'Try an example' }).click();
+  await expect(page.getByRole('tab', { name: 'Run' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('textbox', { name: 'Prompt' })).toHaveValue(/cooling chain/);
+});

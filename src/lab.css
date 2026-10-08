@@ -941,3 +941,322 @@
   font-weight: 600;
   text-underline-offset: 3px;
 }
+
+/* Lab tabs and the plain-language explainer */
+.lab-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--nova-silver);
+}
+.lab-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--nova-muted);
+  padding: 10px 14px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+.lab-tabs button.on {
+  color: var(--nova-midnight);
+  border-bottom-color: var(--nova-blue);
+}
+.lab-tabs button:focus-visible {
+  outline: 2px solid var(--nova-blue);
+  outline-offset: -2px;
+  border-radius: 6px 6px 0 0;
+}
+.lab-panel,
+.lab-explain {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.lab-explain-hero {
+  background: linear-gradient(180deg, #f2f7fb 0%, var(--nova-surface) 70%);
+  padding: 22px 22px 20px;
+}
+.lab-explain-hero .g7-label {
+  margin: 0 0 6px;
+}
+.lab-explain-hero h2 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+  font-weight: 620;
+  color: var(--nova-midnight);
+  max-width: 46em;
+}
+.lab-explain-keys {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+.lab-explain-key {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  column-gap: 8px;
+  align-items: start;
+  border: 1px solid var(--nova-hairline);
+  background: var(--nova-surface);
+  border-radius: 12px;
+  padding: 12px;
+}
+.lab-explain-key span {
+  grid-row: span 2;
+  color: var(--nova-blue);
+  padding-top: 1px;
+}
+.lab-explain-key strong {
+  font-size: 14px;
+  color: var(--nova-ink);
+}
+.lab-explain-key small {
+  font-size: 12.5px;
+  color: var(--nova-muted);
+  line-height: 1.4;
+}
+.lab-explain-h {
+  margin: 0 0 12px;
+  font-size: 17px;
+  font-weight: 640;
+  letter-spacing: -0.01em;
+  color: var(--nova-midnight);
+}
+.lab-explain-lead {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--nova-ink);
+  max-width: 62em;
+}
+.lab-flow {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+.lab-flow li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--nova-hairline);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--nova-porcelain);
+  min-width: 0;
+}
+.lab-flow-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: #e5f0f8;
+  color: var(--nova-blue);
+  margin-bottom: 4px;
+}
+.lab-flow-who {
+  font: 600 11px/1.3 var(--nova-mono);
+  color: var(--nova-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.lab-flow strong {
+  font-size: 14px;
+  color: var(--nova-ink);
+}
+.lab-flow-text {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--nova-muted);
+}
+.lab-flow-arrow {
+  position: absolute;
+  right: -15px;
+  top: 22px;
+  color: var(--nova-blue);
+  background: var(--nova-surface);
+  border-radius: 50%;
+  z-index: 1;
+}
+.lab-flow-loop {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fbf5ec;
+  color: #6d4510;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.lab-flow-loop svg {
+  flex: none;
+  margin-top: 2px;
+}
+.lab-roles,
+.lab-secure {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.lab-roles li,
+.lab-secure li {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  column-gap: 8px;
+  row-gap: 3px;
+  border: 1px solid var(--nova-hairline);
+  border-radius: 12px;
+  padding: 12px;
+  min-width: 0;
+}
+.lab-roles svg,
+.lab-secure svg {
+  grid-row: span 2;
+  color: var(--nova-blue);
+  margin-top: 1px;
+}
+.lab-secure svg {
+  color: var(--nova-teal);
+}
+.lab-roles strong,
+.lab-secure strong {
+  font-size: 14px;
+  color: var(--nova-ink);
+}
+.lab-roles span,
+.lab-secure span {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--nova-muted);
+}
+.lab-bounds {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.lab-bounds > div {
+  border-radius: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--nova-hairline);
+}
+.lab-bounds > div:first-child {
+  background: #f3fafa;
+  border-color: #c4e3e4;
+}
+.lab-bounds > div:last-child {
+  background: #fcf4f3;
+  border-color: #efd0cd;
+}
+.lab-bounds h3 {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+.lab-bounds-can {
+  color: var(--nova-teal);
+}
+.lab-bounds-never {
+  color: var(--nova-red);
+}
+.lab-bounds ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--nova-ink);
+}
+.lab-proven {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lab-proven li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--nova-ink);
+}
+.lab-proven svg {
+  flex: none;
+  margin-top: 2px;
+}
+.lab-proven li.done svg {
+  color: var(--nova-teal);
+}
+.lab-proven li.next {
+  color: var(--nova-muted);
+}
+.lab-proven li.next svg {
+  color: var(--nova-amber);
+}
+.lab-explain-try {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.lab-explain-try .lab-explain-lead {
+  margin: 0;
+}
+@media (max-width: 900px) {
+  .lab-flow {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .lab-flow li {
+    display: grid;
+    grid-template-columns: 36px 1fr;
+    column-gap: 12px;
+    row-gap: 2px;
+  }
+  .lab-flow-icon {
+    grid-row: span 3;
+    margin: 0;
+  }
+  .lab-flow-arrow {
+    display: none;
+  }
+}
+@media (max-width: 640px) {
+  .lab-explain-keys,
+  .lab-roles,
+  .lab-secure,
+  .lab-bounds {
+    grid-template-columns: 1fr;
+  }
+  .lab-explain-hero h2 {
+    font-size: 19px;
+  }
+}
+.lab-roles li,
+.lab-secure li,
+.lab-explain-key {
+  align-content: start;
+}
