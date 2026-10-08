@@ -1,5 +1,7 @@
 # NOVA · Engineering workspace
 
+> **Branch `claude-iterop-orchestrator`:** a simplified, UI-free connector that lets Claude (your own Claude account) drive ITEROP directly. Start here: [docs/iterop/CLAUDE-DIRECT.md](docs/iterop/CLAUDE-DIRECT.md) · `npm run iterop:mcp`.
+
 A natural-language engineering workspace with a governed, read-only **Business Process (ITEROP)** connector, an engineering-item gateway, a semantic MCP server, and an AURA observation lab (deferred).
 
 **Claude project handover:** Read [CLAUDE.md](CLAUDE.md) for implementation ownership and [the full handover](docs/CLAUDE-HANDOVER.md) for the verified baseline, architecture, setup, limitations, and continuation backlog.
