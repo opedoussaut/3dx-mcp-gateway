@@ -266,6 +266,92 @@ test('designer-generated variable ids are resolved by name and translated both w
   });
 });
 
+test('a run-only account (definition 403) still starts, completes and passes the probe', async () => {
+  const { derivedVariableId } = await import('../server/iterop/lab-live');
+  assert.equal(
+    derivedVariableId('Operating envelope', 'start_itLoadKw'),
+    'operatingEnvelope_startItloadkw',
+  );
+  assert.equal(
+    derivedVariableId('[Engineering reviewer] Engineering sign-off', 'engineeringSignoff_decision'),
+    'engineeringReviewerEnginee_engineeringsignoffDecision',
+  );
+  const posts: { path: string; body: { data: Record<string, unknown> } }[] = [];
+  const fetcher: typeof fetch = async (input, init) => {
+    const path = new URL(String(input)).pathname.replace('/api/businessprocess/v2', '');
+    if (init?.method === 'POST') {
+      posts.push({ path, body: JSON.parse(String(init.body)) });
+      return new Response(null, { status: path.startsWith('/runtime/processes') ? 201 : 200 });
+    }
+    if (path === '/repository/processes/startable/list')
+      return json({ responses: [{ key: 'tenantCoolingChain', name: 'NOVA lab', version: 1 }] });
+    if (path === '/repository/processes/tenantCoolingChain')
+      return json({ code: 403, message: 'User not authorized.' }, 403);
+    if (path === '/runtime/tasks') return json([]);
+    if (path === '/runtime/tasks/T1')
+      return json({
+        id: 'T1',
+        name: '[Operator (NOVA acts as you)] Select coolant',
+        expectedFields: ['Fluid', 'Cp', 'Density', 'Rationale'].map((f) => ({
+          id: `operatorNovaActsAsYouSelec_coolantselection${f}`,
+        })),
+      });
+    return json({}, 404);
+  };
+  const engine = createLiveEngine(config(), fetcher)!;
+  const probe = await probeLive(engine);
+  assert.equal(probe.outcome, 'PASS', JSON.stringify(probe.checks));
+  assert.ok(
+    probe.checks.some((c) => c.name === 'Process definition' && /run rights only/.test(c.detail)),
+  );
+  await engine.startProcess('syn-cooling-chain', {
+    identificator: 'COOL-001',
+    data: {
+      start_itLoadKw: 1200,
+      start_facilityWaterC: 32,
+      start_rackCount: 16,
+      start_redundancy: 'N+1',
+    },
+  });
+  assert.deepEqual(Object.keys(posts[0].body.data), [
+    'operatingEnvelope_startItloadkw',
+    'operatingEnvelope_startFacilitywaterc',
+    'operatingEnvelope_startRackcount',
+    'operatingEnvelope_startRedundancy',
+  ]);
+  await engine.completeTask('T1', {
+    data: {
+      coolantSelection_fluid: 'PG25',
+      coolantSelection_cp: 3.93,
+      coolantSelection_density: 1020,
+      coolantSelection_rationale: 'lab rule',
+    },
+  });
+  assert.deepEqual(posts[1].body.data, {
+    operatorNovaActsAsYouSelec_coolantselectionFluid: 'PG25',
+    operatorNovaActsAsYouSelec_coolantselectionCp: 3.93,
+    operatorNovaActsAsYouSelec_coolantselectionDensity: 1020,
+    operatorNovaActsAsYouSelec_coolantselectionRationale: 'lab rule',
+  });
+  // A form that lacks a field NOVA must write stops before the write.
+  const partial = createLiveEngine(config(), async (input, init) => {
+    if (init?.method === 'POST') throw new Error('must not write');
+    return json({
+      id: 'T2',
+      name: 'Select coolant',
+      expectedFields: [{ id: 'operatorNovaActsAsYouSelec_coolantselectionFluid' }],
+    });
+  })!;
+  await assert.rejects(
+    Promise.resolve(
+      partial.completeTask('T2', {
+        data: { coolantSelection_fluid: 'PG25', coolantSelection_rationale: 'x' },
+      }),
+    ),
+    /no field for coolantSelection_rationale/,
+  );
+});
+
 test('a task outside the lab processes cannot be completed', async () => {
   const fetcher: typeof fetch = async (input, init) =>
     init?.method === 'GET'
