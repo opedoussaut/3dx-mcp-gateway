@@ -5,6 +5,8 @@ import { createApp } from './app';
 
 if (existsSync('.env')) process.loadEnvFile('.env');
 const app = createApp();
+// The standalone orchestration lab page.
+app.get('/lab', (_req, res) => res.redirect('/lab.html'));
 const production = process.argv.includes('--production');
 if (production) {
   app.use((_req, res, next) => {

@@ -116,6 +116,18 @@ export const labLiveStatus = (c: LabLiveConfig) => ({
   ready: c.blockers.length === 0,
   blockers: c.blockers,
   drive: c.contract?.driveApproval.operations ?? [],
+  /** Presence only — never a key, secret or agent id. */
+  settings: {
+    gateway: c.origin ? new URL(c.origin).host : null,
+    apiKey: Boolean(c.apiKey),
+    agent: Boolean(c.agent),
+    contract: Boolean(c.contract),
+    processes: c.contract
+      ? Object.entries(c.contract.processKeys)
+          .filter(([, v]) => v)
+          .map(([k]) => k)
+      : [],
+  },
 });
 
 const MAX_BYTES = 1_000_000;

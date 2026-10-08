@@ -866,3 +866,65 @@
   color: #8796a5;
   cursor: not-allowed;
 }
+
+/* Standalone lab page */
+.lab-standalone {
+  max-width: 980px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: var(--nova-porcelain);
+}
+.lab-settings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 8px;
+}
+.lab-settings li {
+  display: grid;
+  grid-template-columns: 16px auto;
+  column-gap: 6px;
+  align-items: center;
+  font-size: 12.5px;
+  border: 1px solid var(--nova-hairline);
+  border-radius: 10px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+.lab-settings li span {
+  grid-column: 2;
+  font: 500 11.5px/1.4 var(--nova-mono);
+  color: var(--nova-muted);
+  overflow-wrap: anywhere;
+}
+.lab-settings li.ok {
+  border-color: #a9d9da;
+  background: #f3fafa;
+}
+.lab-settings li.ok svg {
+  color: var(--nova-teal);
+}
+.lab-settings li.missing svg {
+  color: #7a4a0e;
+}
+.lab-connection-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.lab-connection-foot .lab-fine {
+  margin: 0;
+  flex: 1 1 280px;
+}
+.lab-foot {
+  text-align: center;
+  padding: 8px 0 16px;
+}
+.lab-foot a {
+  color: var(--nova-blue);
+}

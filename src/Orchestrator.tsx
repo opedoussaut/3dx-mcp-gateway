@@ -30,9 +30,20 @@ type Queue = {
   process: { identificator: string; instanceId: string; name: string };
   decisions: string[];
 }[];
-type LabState = {
+export type LabState = {
   source: 'synthetic' | 'live';
-  live: { ready: boolean; blockers: string[]; drive: string[] };
+  live: {
+    ready: boolean;
+    blockers: string[];
+    drive: string[];
+    settings: {
+      gateway: string | null;
+      apiKey: boolean;
+      agent: boolean;
+      contract: boolean;
+      processes: string[];
+    };
+  };
   specRelease: string;
   operations: {
     operationId: string;
@@ -45,8 +56,8 @@ type LabState = {
   runs: OrchestrationRun[];
   reviewerQueue: Queue;
 };
-type Reply = { run?: OrchestrationRun; state: LabState };
-type Probe = {
+export type Reply = { run?: OrchestrationRun; state: LabState };
+export type Probe = {
   checkedAt: string;
   outcome: 'PASS' | 'PARTIAL' | 'DENIED' | 'FAIL';
   checks: { name: string; ok: boolean; detail: string }[];
@@ -375,7 +386,7 @@ function Empty() {
   );
 }
 
-function ChainCanvas({ run }: { run: OrchestrationRun }) {
+export function ChainCanvas({ run }: { run: OrchestrationRun }) {
   const reworked = run.findings.some((f) => f.startsWith('Reviewer:'));
   return (
     <section className="lab-card lab-canvas" aria-label="Process chain">
@@ -450,7 +461,7 @@ function Node({
   );
 }
 
-function Trace({ run }: { run: OrchestrationRun }) {
+export function Trace({ run }: { run: OrchestrationRun }) {
   const sent = run.steps.filter((s) => s.status === 'done' && s.kind !== 'compute').length;
   return (
     <section className="lab-card lab-trace-card" aria-label="Process trace">
@@ -519,7 +530,7 @@ function StepIcon({ status }: { status: OrchestrationStep['status'] }) {
   return <CircleDashed size={14} aria-hidden="true" />;
 }
 
-function RunCard({
+export function RunCard({
   run,
   pending,
   busy,
@@ -652,7 +663,7 @@ function RunCard({
   );
 }
 
-function Reviewer({
+export function Reviewer({
   queue,
   busy,
   sign,

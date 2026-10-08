@@ -65,6 +65,8 @@ They show how tools attach to process tasks. **They are not engineering values.*
 
 ## Use it
 
+**Standalone page:** run `npm run dev` and open <http://127.0.0.1:3000/lab> (*ITEROP orchestration lab*). It holds the connection status, the read-only connection test, one prompt box, the approval cards and the trace, and nothing else. It uses the same server, engines and approval gates as the portal's Orchestration view.
+
 ```bash
 npm run dev            # http://127.0.0.1:3000 → Orchestration
 npm run mcp            # stdio MCP: lab_run_command, lab_approve_write, lab_cancel_run (synthetic only)
