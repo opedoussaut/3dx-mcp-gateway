@@ -18,6 +18,7 @@ import {
   type LabOperationId,
 } from './drive';
 import { basicProcessInfo, startableProcessesList, tasksByUser } from './fd04';
+import type { ProcessDefinition } from './chain';
 import { SPEC } from './operations';
 import { EngineError, type ProcessEngine } from './simulator';
 
@@ -249,10 +250,57 @@ const check = <T>(schema: z.ZodType<T>, body: unknown, op: string): T => {
   return parsed.data;
 };
 
+type ProcessInfo = z.infer<typeof processInfoResponse>;
+type VariableMap = { toTenant: Map<string, string>; toLab: Map<string, string> };
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+/**
+ * The designer generates variable ids as `<element>_<camelCaseName>` (a field named
+ * `start_itLoadKw` on "Operating envelope" becomes `operatingEnvelope_startItloadkw`). A tenant id
+ * matches a lab id when its generated part equals the lab id, or the lab id's own field part,
+ * ignoring case and punctuation.
+ */
+export const matchesField = (tenantId: string, labId: string) => {
+  if (tenantId === labId) return true;
+  const generated = norm(tenantId.slice(tenantId.lastIndexOf('_') + 1));
+  return (
+    generated !== '' &&
+    (generated === norm(labId) || generated === norm(labId.slice(labId.lastIndexOf('_') + 1)))
+  );
+};
+/** Resolve every lab field of one process to the id the tenant model declares, task by task. */
+export function resolveVariables(def: ProcessDefinition, info: ProcessInfo) {
+  const toTenant = new Map<string, string>();
+  const missing: { scope: string; ids: string[] }[] = [];
+  const taskOutputIds = new Set<string>();
+  for (const t of [...def.tasks, ...(def.rework ? [def.rework] : [])]) {
+    const human = info.humanTasks?.find((h) => sameTask(h.name, t.name));
+    const ids = (human?.outputs ?? []).map((o) => o.id).filter((x): x is string => Boolean(x));
+    ids.forEach((x) => taskOutputIds.add(x));
+    const absent: string[] = [];
+    for (const f of t.expectedFields) {
+      const found = ids.find((x) => matchesField(x, f.id));
+      if (found) toTenant.set(f.id, found);
+      else if (f.required) absent.push(f.id);
+    }
+    if (!human) missing.push({ scope: t.name, ids: ['(task not found)'] });
+    else if (absent.length) missing.push({ scope: t.name, ids: absent });
+  }
+  const startCandidates = Object.keys(info.variables ?? {}).filter((x) => !taskOutputIds.has(x));
+  const absentStart: string[] = [];
+  for (const v of def.startVariables) {
+    const found = startCandidates.find((x) => matchesField(x, v.id));
+    if (found) toTenant.set(v.id, found);
+    else if (v.required) absentStart.push(v.id);
+  }
+  if (absentStart.length) missing.push({ scope: 'start form', ids: absentStart });
+  return { toTenant, missing };
+}
+
 export class LiveEngine implements ProcessEngine {
   readonly source = 'live' as const;
   private toTenant: Map<string, string>;
   private toLab: Map<string, string>;
+  private variables?: Promise<VariableMap>;
   constructor(
     private contract: LabContract,
     private http: GatewayHttp,
@@ -265,6 +313,44 @@ export class LiveEngine implements ProcessEngine {
   }
   admits(labKey: string) {
     return this.toTenant.has(labKey);
+  }
+  /** Re-read the deployed models (after a redeploy, or before a connection test). */
+  refreshVariables() {
+    this.variables = undefined;
+  }
+  private async variableMap(): Promise<VariableMap> {
+    this.variables ??= (async () => {
+      const toTenant = new Map<string, string>();
+      for (const d of definitions)
+        if (this.admits(d.key))
+          for (const [a, b] of resolveVariables(d, await this.getProcessInfo(d.key)).toTenant)
+            toTenant.set(a, b);
+      return { toTenant, toLab: new Map([...toTenant].map(([a, b]) => [b, a])) };
+    })().catch((e) => {
+      this.variables = undefined;
+      throw e;
+    });
+    return this.variables;
+  }
+  private async toTenantData(data: Record<string, unknown>, required: Set<string>) {
+    const { toTenant } = await this.variableMap();
+    const out: Record<string, unknown> = {};
+    const unknown: string[] = [];
+    for (const [k, v] of Object.entries(data)) {
+      const id = toTenant.get(k);
+      if (id) out[id] = v;
+      else if (required.has(k)) unknown.push(k);
+    }
+    if (unknown.length)
+      throw new EngineError(
+        400,
+        `The tenant model declares no field for ${unknown.join(', ')}. Run the connection test.`,
+      );
+    return out;
+  }
+  private async labIds<T extends { id?: string }>(items: T[] | undefined) {
+    const { toLab } = await this.variableMap();
+    return items?.map((i) => ({ ...i, id: (i.id && toLab.get(i.id)) ?? i.id }));
   }
   private tenant(labKey: string) {
     const key = this.toTenant.get(labKey);
@@ -308,19 +394,26 @@ export class LiveEngine implements ProcessEngine {
   async getTasksByUser() {
     return check(tasksByUser, await this.http.call('getTasksByUser', {}), 'getTasksByUser');
   }
+  /** Field ids are returned under NOVA's lab ids, so the orchestrator never sees tenant ids. */
   async getTaskInstanceInformations(taskId: string) {
-    return check(
+    const body = check(
       taskInstanceResponse,
       await this.http.call('getTaskInstanceInformations', { taskId: taskIdOf(taskId) }),
       'getTaskInstanceInformations',
     );
+    return {
+      ...body,
+      expectedFields: await this.labIds(body.expectedFields),
+      providedData: await this.labIds(body.providedData),
+    };
   }
   async getInstanceInfo(instanceId: string) {
-    return check(
+    const body = check(
       instanceInfoResponse,
       await this.http.call('getInstanceInfo', { instanceId: taskIdOf(instanceId) }),
       'getInstanceInfo',
     );
+    return { ...body, variables: await this.labIds(body.variables) };
   }
   async startProcess(labKey: string, body: unknown) {
     this.allowed('startProcess');
@@ -332,7 +425,13 @@ export class LiveEngine implements ProcessEngine {
     for (const k of Object.keys(parsed.data.data ?? {}))
       if (!allowedVars.has(k))
         throw new EngineError(400, `${k} is not a start variable of the lab process.`);
-    await this.http.call('startProcess', { processKey: this.tenant(labKey) }, parsed.data);
+    const required = new Set(def?.startVariables.filter((v) => v.required).map((v) => v.id));
+    const data = await this.toTenantData(parsed.data.data ?? {}, required);
+    await this.http.call(
+      'startProcess',
+      { processKey: this.tenant(labKey) },
+      { ...parsed.data, data },
+    );
     return { status: 201 as const };
   }
   async completeTask(taskId: string, body: unknown) {
@@ -349,7 +448,14 @@ export class LiveEngine implements ProcessEngine {
     );
     if (!info.name || !known.has(taskName(info.name)))
       throw new EngineError(403, 'That task does not belong to a lab process.');
-    await this.http.call('completeTask', { taskId: taskIdOf(taskId) }, parsed.data);
+    const required = new Set(
+      definitions
+        .flatMap((d) => [...d.tasks, ...(d.rework ? [d.rework] : [])])
+        .filter((t) => sameTask(t.name, info.name))
+        .flatMap((t) => t.expectedFields.filter((f) => f.required).map((f) => f.id)),
+    );
+    const data = await this.toTenantData(parsed.data.data ?? {}, required);
+    await this.http.call('completeTask', { taskId: taskIdOf(taskId) }, { ...parsed.data, data });
     return { status: 200 as const };
   }
 }
@@ -389,42 +495,31 @@ export async function probeLive(engine: LiveEngine): Promise<ProbeResult> {
   const checks: ProbeResult['checks'] = [];
   const record = (name: string, ok: boolean, detail: string) => checks.push({ name, ok, detail });
   try {
+    engine.refreshVariables();
     const list = await engine.getAllStartableProcesses();
     for (const d of definitions) {
       if (!engine.admits(d.key)) continue;
       record(
         `${d.name} is startable`,
         list.responses.some((p) => p.key === d.key),
-        'getAllStartableProcesses',
+        list.responses.some((p) => p.key === d.key)
+          ? 'getAllStartableProcesses'
+          : 'not in the agent’s startable list: deploy it and add the agent’s user as initiator',
       );
       const info = await engine.getProcessInfo(d.key);
-      for (const t of [...d.tasks, ...(d.rework ? [d.rework] : [])]) {
-        const task = info.humanTasks?.find((h) => sameTask(h.name, t.name));
-        const outputs = new Set((task?.outputs ?? []).map((o) => o.id));
-        const missing = t.expectedFields
-          .filter((f) => f.required && !outputs.has(f.id))
-          .map((f) => f.id);
+      const { toTenant, missing } = resolveVariables(d, info);
+      for (const scope of [
+        'start form',
+        ...[...d.tasks, ...(d.rework ? [d.rework] : [])].map((t) => t.name),
+      ]) {
+        const m = missing.find((x) => x.scope === scope);
         record(
-          `“${t.name}” is modelled`,
-          Boolean(task) && missing.length === 0,
-          !task
-            ? 'task not found in getProcessInfo'
-            : missing.length
-              ? `missing outputs: ${missing.join(', ')}`
-              : 'all outputs declared',
+          scope === 'start form' ? `${d.name} start form` : `“${scope}” is modelled`,
+          !m,
+          m ? `missing: ${m.ids.join(', ')}` : 'all fields found',
         );
       }
-      const vars = info.variables ?? {};
-      const missingStart = d.startVariables
-        .filter((s) => s.required && !(s.id in vars))
-        .map((s) => s.id);
-      record(
-        `${d.name} start form`,
-        missingStart.length === 0,
-        missingStart.length
-          ? `missing: ${missingStart.join(', ')}`
-          : 'all start variables declared',
-      );
+      record('Field mapping', true, `${toTenant.size} lab fields resolved to tenant ids`);
     }
     const tasks = await engine.getTasksByUser();
     record(

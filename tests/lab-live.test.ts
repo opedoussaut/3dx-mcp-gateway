@@ -209,6 +209,63 @@ test('task names prefixed with their BPMN lane still match the lab definition', 
   assert.ok(completed);
 });
 
+test('designer-generated variable ids are resolved by name and translated both ways', async () => {
+  const { matchesField, resolveVariables } = await import('../server/iterop/lab-live');
+  const { definition } = await import('../server/iterop/chain');
+  assert.ok(matchesField('operatingEnvelope_startItloadkw', 'start_itLoadKw'));
+  assert.ok(matchesField('operatingEnvelope_itloadkw', 'start_itLoadKw'));
+  assert.ok(!matchesField('operatingEnvelope_rackcount', 'start_itLoadKw'));
+  const d = definition('syn-cooling-chain')!;
+  // The tenant ids the designer would generate for fields named exactly like NOVA's ids.
+  const gen = (element: string, id: string) => `${element}_${id.replace('_', '').toLowerCase()}`;
+  const tasks = [...d.tasks, d.rework!];
+  const info = {
+    humanTasks: tasks.map((t) => ({
+      name: `[Operator] ${t.name}`,
+      outputs: t.expectedFields.map((f) => ({ id: gen(t.id + 'Task', f.id) })),
+    })),
+    variables: Object.fromEntries(
+      [...d.startVariables.map((v) => gen('operatingEnvelope', v.id)), 'identificatorInstance'].map(
+        (id) => [id, { id }],
+      ),
+    ),
+  };
+  const { toTenant, missing } = resolveVariables(d, info);
+  assert.deepEqual(missing, []);
+  assert.equal(toTenant.get('start_itLoadKw'), 'operatingEnvelope_startitloadkw');
+  // Same field name on the rework task and the start form resolves to different ids.
+  assert.notEqual(toTenant.get('configurationRework_coolant'), toTenant.get('start_coolant'));
+  let started: { data: Record<string, unknown> } | undefined;
+  const engine = createLiveEngine(config(), async (input, init) => {
+    const path = new URL(String(input)).pathname;
+    if (init?.method === 'POST') {
+      started = JSON.parse(String(init.body));
+      return new Response(null, { status: 201 });
+    }
+    if (
+      path.endsWith('/repository/processes/syn-cooling-chain') ||
+      path.endsWith('/tenantCoolingChain')
+    )
+      return json(info);
+    return json({}, 404);
+  })!;
+  await engine.startProcess('syn-cooling-chain', {
+    identificator: 'COOL-001',
+    data: {
+      start_itLoadKw: 1200,
+      start_facilityWaterC: 32,
+      start_rackCount: 16,
+      start_redundancy: 'N+1',
+    },
+  });
+  assert.deepEqual(started!.data, {
+    operatingEnvelope_startitloadkw: 1200,
+    operatingEnvelope_startfacilitywaterc: 32,
+    operatingEnvelope_startrackcount: 16,
+    operatingEnvelope_startredundancy: 'N+1',
+  });
+});
+
 test('a task outside the lab processes cannot be completed', async () => {
   const fetcher: typeof fetch = async (input, init) =>
     init?.method === 'GET'
@@ -273,7 +330,7 @@ test('the read-only probe reports PASS for a matching model and PARTIAL when fie
   const bad = gatewayDouble({ expectedFields: false });
   const partial = await probeLive(createLiveEngine(config(), bad.fetcher)!);
   assert.equal(partial.outcome, 'PARTIAL');
-  assert.ok(partial.checks.some((c) => /missing outputs: coolantSelection_fluid/.test(c.detail)));
+  assert.ok(partial.checks.some((c) => /missing: coolantSelection_fluid/.test(c.detail)));
   const denied = await probeLive(createLiveEngine(config(), async () => json({}, 403))!);
   assert.equal(denied.outcome, 'DENIED');
 });
