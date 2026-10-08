@@ -8,6 +8,7 @@ import {
   Reviewer,
   RunCard,
   Trace,
+  playLink,
   type LabState,
   type Probe,
   type Reply,
@@ -257,6 +258,8 @@ export default function LabApp() {
           run={active}
           pending={pending}
           busy={busy}
+          openUrl={playLink(state, active)}
+          inboxUrl={active.source === 'live' ? state?.live.play?.home : undefined}
           approve={(all) =>
             pending && call(`/lab/runs/${active.id}/approve`, { stepId: pending.id, all })
           }

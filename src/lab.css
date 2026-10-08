@@ -928,3 +928,16 @@
 .lab-foot a {
   color: var(--nova-blue);
 }
+
+.lab-links {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 10px 0 0;
+  font-size: 13.5px;
+}
+.lab-links a {
+  color: var(--nova-blue);
+  font-weight: 600;
+  text-underline-offset: 3px;
+}

@@ -542,3 +542,21 @@ test('HTTP lab API runs live only when configured, and probes read-only', async 
     off.close();
   }
 });
+
+test('"Open in ITEROP" links are built from the optional play origin and the tenant key', async () => {
+  const { labLiveStatus } = await import('../server/iterop/lab-live');
+  const without = labLiveStatus(config());
+  assert.equal(without.play, null);
+  const status = labLiveStatus({ ...config(), playOrigin: 'https://sandbox-bpa.example.test' });
+  assert.equal(
+    status.play!.instance['syn-cooling-chain'],
+    'https://sandbox-bpa.example.test/play/monitoring/processes/tenantCoolingChain?layer=monitoring-instances/{instanceId}',
+  );
+  assert.equal(status.play!.home, 'https://sandbox-bpa.example.test/play');
+  const env = { NOVA_LAB_PLAY_ORIGIN: 'https://sandbox-bpa.example.test/some/path' };
+  assert.equal(loadLabLiveConfig(env).playOrigin, 'https://sandbox-bpa.example.test');
+  assert.equal(
+    loadLabLiveConfig({ NOVA_LAB_PLAY_ORIGIN: 'http://insecure.test' }).playOrigin,
+    undefined,
+  );
+});

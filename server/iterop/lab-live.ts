@@ -72,6 +72,8 @@ export type LabContract = z.infer<typeof labContractSchema>;
 
 export type LabLiveConfig = {
   origin?: string;
+  /** Optional: the process application origin, used only to build "Open in ITEROP" links. */
+  playOrigin?: string;
   apiKey?: string;
   agent?: string;
   contract?: LabContract;
@@ -101,6 +103,15 @@ export function loadLabLiveConfig(env: NodeJS.ProcessEnv = process.env): LabLive
       );
     }
   } else blockers.push('Set NOVA_LAB_GATEWAY_ORIGIN to the sandbox API Gateway origin.');
+  let playOrigin: string | undefined;
+  if (v('PLAY_ORIGIN')) {
+    try {
+      const u = new URL(v('PLAY_ORIGIN')!);
+      if (u.protocol === 'https:' && !u.username && !u.password) playOrigin = u.origin;
+    } catch {
+      /* optional convenience setting: ignore an invalid value */
+    }
+  }
   const apiKey = v('API_KEY');
   if (!apiKey) blockers.push('Set NOVA_LAB_API_KEY (the API Gateway application key).');
   let agent: string | undefined;
@@ -124,7 +135,7 @@ export function loadLabLiveConfig(env: NodeJS.ProcessEnv = process.env): LabLive
       );
     }
   } else blockers.push('Install the reviewed lab contract (NOVA_LAB_CONTRACT_FILE).');
-  return { origin, apiKey, agent, contract, blockers };
+  return { origin, playOrigin, apiKey, agent, contract, blockers };
 }
 
 export const labLiveStatus = (c: LabLiveConfig) => ({
@@ -143,6 +154,25 @@ export const labLiveStatus = (c: LabLiveConfig) => ({
           .map(([k]) => k)
       : [],
   },
+  /**
+   * Browser links into the process application (the user's own session; NOVA never calls them).
+   * The monitoring URL pattern is the one Play shows for an instance; it is not an API contract.
+   */
+  play:
+    c.playOrigin && c.contract
+      ? {
+          origin: c.playOrigin,
+          instance: Object.fromEntries(
+            Object.entries(c.contract.processKeys)
+              .filter((e): e is [string, string] => Boolean(e[1]))
+              .map(([lab, tenant]) => [
+                lab,
+                `${c.playOrigin}/play/monitoring/processes/${encodeURIComponent(tenant)}?layer=monitoring-instances/{instanceId}`,
+              ]),
+          ),
+          home: `${c.playOrigin}/play`,
+        }
+      : null,
 });
 
 const MAX_BYTES = 1_000_000;

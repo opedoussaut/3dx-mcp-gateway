@@ -43,6 +43,7 @@ export type LabState = {
       contract: boolean;
       processes: string[];
     };
+    play: { origin: string; instance: Record<string, string>; home: string } | null;
   };
   specRelease: string;
   operations: {
@@ -105,6 +106,16 @@ const stageIcon: Record<string, typeof Cpu> = {
   requirementReview: Stamp,
 };
 const json = (v: unknown) => JSON.stringify(v, null, 2);
+/** "Open in ITEROP" link for a live run, when the play origin is configured. */
+export function playLink(state: LabState | null, run: OrchestrationRun) {
+  const template =
+    run.source === 'live' && run.processKey
+      ? state?.live.play?.instance[run.processKey]
+      : undefined;
+  return template && run.instanceId && /^[A-Za-z0-9_.:-]+$/.test(run.instanceId)
+    ? template.replace('{instanceId}', encodeURIComponent(run.instanceId))
+    : undefined;
+}
 
 export function OrchestratorView() {
   const [state, setState] = useState<LabState | null>(null);
@@ -329,6 +340,8 @@ export function OrchestratorView() {
               run={active}
               pending={pending}
               busy={busy}
+              openUrl={playLink(state, active)}
+              inboxUrl={active.source === 'live' ? state?.live.play?.home : undefined}
               approve={(all) =>
                 pending && call(`/lab/runs/${active.id}/approve`, { stepId: pending.id, all })
               }
@@ -536,10 +549,14 @@ export function RunCard({
   busy,
   approve,
   cancel,
+  openUrl,
+  inboxUrl,
 }: {
   run: OrchestrationRun;
   pending?: OrchestrationStep;
   busy: boolean;
+  openUrl?: string;
+  inboxUrl?: string;
   approve: (all: boolean) => void;
   cancel: () => void;
 }) {
@@ -552,6 +569,20 @@ export function RunCard({
       </div>
       <blockquote>{run.prompt}</blockquote>
       <p className="lab-summary">{run.summary}</p>
+      {(openUrl || (inboxUrl && run.status === 'awaiting_signoff')) && (
+        <p className="lab-links">
+          {openUrl && (
+            <a href={openUrl} target="_blank" rel="noopener noreferrer">
+              Open {run.identificator ?? 'this run'} in ITEROP ↗
+            </a>
+          )}
+          {inboxUrl && run.status === 'awaiting_signoff' && (
+            <a href={inboxUrl} target="_blank" rel="noopener noreferrer">
+              Sign off in ITEROP Play ↗
+            </a>
+          )}
+        </p>
+      )}
       {run.missing.length > 0 && (
         <ul className="lab-missing">
           {run.missing.map((m) => (
