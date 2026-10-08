@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  NOVA orchestration lab — Liquid cooling configuration chain (synthetic, neutral test process).
+  Standard BPMN 2.0 with diagram interchange. Task ids and names match server/iterop/chain.ts;
+  the variables listed in each <documentation> must be created in the process forms with exactly
+  these ids (see docs/iterop/LAB-SANDBOX.md). Invented example content only.
+-->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  id="Definitions_novaLabCoolingChain"
+  targetNamespace="https://github.com/opedoussaut/3dx-mcp-gateway/lab"
+  exporter="NOVA lab" exporterVersion="1">
+  <bpmn:collaboration id="Collaboration_coolingChain">
+    <bpmn:participant id="Participant_coolingChain" name="NOVA lab — Liquid cooling configuration chain" processRef="syn-cooling-chain" />
+  </bpmn:collaboration>
+  <bpmn:process id="syn-cooling-chain" name="NOVA lab — Liquid cooling configuration chain" isExecutable="true">
+    <bpmn:documentation>Synthetic test process for the NOVA orchestration lab. Start form variables: start_itLoadKw (DECIMAL, 50-20000, kW), start_facilityWaterC (DECIMAL, 10-45, degC), start_rackCount (INTEGER, 1-500), start_redundancy (SELECT N##N+1##2N, default N+1), start_coolant (SELECT auto##water##PG25, default auto, optional). Instance identificator: COOL-nnn, set by the caller.</bpmn:documentation>
+    <bpmn:laneSet id="LaneSet_coolingChain">
+      <bpmn:lane id="Lane_operator" name="Operator (NOVA acts as you)">
+        <bpmn:flowNodeRef>start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>coolantSelection</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>cduSizing</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>loopConfiguration</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>systemCheck</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>configurationRework</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_reviewer" name="Engineering reviewer">
+        <bpmn:flowNodeRef>engineeringSignoff</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>signoffDecision</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>approved</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="start" name="Operating envelope">
+      <bpmn:outgoing>Flow_start_coolant</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="coolantSelection" name="Select coolant">
+      <bpmn:documentation>Output variables: coolantSelection_fluid (TEXT), coolantSelection_cp (DECIMAL), coolantSelection_density (DECIMAL), coolantSelection_rationale (TEXT_AREA). Assigned to the operator.</bpmn:documentation>
+      <bpmn:incoming>Flow_start_coolant</bpmn:incoming>
+      <bpmn:incoming>Flow_rework_coolant</bpmn:incoming>
+      <bpmn:outgoing>Flow_coolant_cdu</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="cduSizing" name="Size coolant distribution units">
+      <bpmn:documentation>Output variables: cduSizing_model (TEXT), cduSizing_units (INTEGER), cduSizing_dutyUnits (INTEGER), cduSizing_utilisation (DECIMAL). Assigned to the operator.</bpmn:documentation>
+      <bpmn:incoming>Flow_coolant_cdu</bpmn:incoming>
+      <bpmn:outgoing>Flow_cdu_loop</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="loopConfiguration" name="Configure secondary loop">
+      <bpmn:documentation>Output variables: loopConfiguration_supplyC (DECIMAL), loopConfiguration_returnC (DECIMAL), loopConfiguration_flowLpm (DECIMAL), loopConfiguration_rackFlowLpm (DECIMAL). Assigned to the operator.</bpmn:documentation>
+      <bpmn:incoming>Flow_cdu_loop</bpmn:incoming>
+      <bpmn:outgoing>Flow_loop_check</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="systemCheck" name="Check system limits">
+      <bpmn:documentation>Output variables: systemCheck_result (SELECT PASS##REVIEW##FAIL), systemCheck_findings (TEXT_AREA). Assigned to the operator.</bpmn:documentation>
+      <bpmn:incoming>Flow_loop_check</bpmn:incoming>
+      <bpmn:outgoing>Flow_check_signoff</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="engineeringSignoff" name="Engineering sign-off">
+      <bpmn:documentation>Signature task, human only. Output variables: engineeringSignoff_decision (SELECT Approve##Reject), engineeringSignoff_comment (TEXT_AREA, optional). Assign to a reviewer who is not the operator; enable signature.</bpmn:documentation>
+      <bpmn:incoming>Flow_check_signoff</bpmn:incoming>
+      <bpmn:outgoing>Flow_signoff_decision</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="signoffDecision" name="Decision?">
+      <bpmn:incoming>Flow_signoff_decision</bpmn:incoming>
+      <bpmn:outgoing>Flow_approve</bpmn:outgoing>
+      <bpmn:outgoing>Flow_reject</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="approved" name="Configuration approved">
+      <bpmn:incoming>Flow_approve</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:userTask id="configurationRework" name="Rework configuration">
+      <bpmn:documentation>Hand-back to the operator after a rejection. Show engineeringSignoff_comment. Output variables: configurationRework_coolant (SELECT auto##water##PG25), configurationRework_redundancy (SELECT N##N+1##2N), configurationRework_facilityWaterC (DECIMAL 10-45), configurationRework_note (TEXT_AREA). Map the revised values onto start_coolant, start_redundancy and start_facilityWaterC.</bpmn:documentation>
+      <bpmn:incoming>Flow_reject</bpmn:incoming>
+      <bpmn:outgoing>Flow_rework_coolant</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_start_coolant" sourceRef="start" targetRef="coolantSelection" />
+    <bpmn:sequenceFlow id="Flow_coolant_cdu" sourceRef="coolantSelection" targetRef="cduSizing" />
+    <bpmn:sequenceFlow id="Flow_cdu_loop" sourceRef="cduSizing" targetRef="loopConfiguration" />
+    <bpmn:sequenceFlow id="Flow_loop_check" sourceRef="loopConfiguration" targetRef="systemCheck" />
+    <bpmn:sequenceFlow id="Flow_check_signoff" sourceRef="systemCheck" targetRef="engineeringSignoff" />
+    <bpmn:sequenceFlow id="Flow_signoff_decision" sourceRef="engineeringSignoff" targetRef="signoffDecision" />
+    <bpmn:sequenceFlow id="Flow_approve" name="Approve" sourceRef="signoffDecision" targetRef="approved">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">engineeringSignoff_decision == 'Approve'</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_reject" name="Reject" sourceRef="signoffDecision" targetRef="configurationRework">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">engineeringSignoff_decision == 'Reject'</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_rework_coolant" sourceRef="configurationRework" targetRef="coolantSelection" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_coolingChain">
+    <bpmndi:BPMNPlane id="Plane_coolingChain" bpmnElement="Collaboration_coolingChain">
+      <bpmndi:BPMNShape id="Participant_coolingChain_di" bpmnElement="Participant_coolingChain" isHorizontal="true">
+        <dc:Bounds x="120" y="60" width="1180" height="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_operator_di" bpmnElement="Lane_operator" isHorizontal="true">
+        <dc:Bounds x="150" y="60" width="1150" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_reviewer_di" bpmnElement="Lane_reviewer" isHorizontal="true">
+        <dc:Bounds x="150" y="280" width="1150" height="200" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="start_di" bpmnElement="start">
+        <dc:Bounds x="200" y="162" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="176" y="205" width="84" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="coolantSelection_di" bpmnElement="coolantSelection">
+        <dc:Bounds x="280" y="140" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="cduSizing_di" bpmnElement="cduSizing">
+        <dc:Bounds x="440" y="140" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="loopConfiguration_di" bpmnElement="loopConfiguration">
+        <dc:Bounds x="600" y="140" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="systemCheck_di" bpmnElement="systemCheck">
+        <dc:Bounds x="760" y="140" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="configurationRework_di" bpmnElement="configurationRework">
+        <dc:Bounds x="1050" y="140" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="engineeringSignoff_di" bpmnElement="engineeringSignoff">
+        <dc:Bounds x="920" y="340" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="signoffDecision_di" bpmnElement="signoffDecision" isMarkerVisible="true">
+        <dc:Bounds x="1090" y="355" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1090" y="412" width="50" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="approved_di" bpmnElement="approved">
+        <dc:Bounds x="1212" y="362" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1186" y="405" width="88" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_start_coolant_di" bpmnElement="Flow_start_coolant">
+        <di:waypoint x="236" y="180" /><di:waypoint x="280" y="180" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_coolant_cdu_di" bpmnElement="Flow_coolant_cdu">
+        <di:waypoint x="400" y="180" /><di:waypoint x="440" y="180" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_cdu_loop_di" bpmnElement="Flow_cdu_loop">
+        <di:waypoint x="560" y="180" /><di:waypoint x="600" y="180" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_loop_check_di" bpmnElement="Flow_loop_check">
+        <di:waypoint x="720" y="180" /><di:waypoint x="760" y="180" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_check_signoff_di" bpmnElement="Flow_check_signoff">
+        <di:waypoint x="880" y="180" /><di:waypoint x="980" y="180" /><di:waypoint x="980" y="340" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_signoff_decision_di" bpmnElement="Flow_signoff_decision">
+        <di:waypoint x="1040" y="380" /><di:waypoint x="1090" y="380" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_approve_di" bpmnElement="Flow_approve">
+        <di:waypoint x="1140" y="380" /><di:waypoint x="1212" y="380" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1150" y="362" width="44" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_reject_di" bpmnElement="Flow_reject">
+        <di:waypoint x="1115" y="355" /><di:waypoint x="1115" y="220" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1122" y="285" width="34" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_rework_coolant_di" bpmnElement="Flow_rework_coolant">
+        <di:waypoint x="1110" y="140" /><di:waypoint x="1110" y="100" /><di:waypoint x="340" y="100" /><di:waypoint x="340" y="140" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

@@ -2,6 +2,14 @@
 
 The v0.1 blueprint remains the architecture target. This implementation turns its first read-only slice into a runnable local application; it does not claim all blueprint components are complete.
 
+## Process orchestration lab — read and drive (branch `claude/iterop-orchestration-lab`, 8 October 2026)
+
+- `server/iterop/orchestrator.ts`: a deterministic natural-language orchestrator. It plans FD04 reads (`getAllStartableProcesses`, `getBasicProcessInfo`, `getTasksByUser`, `getTaskInstanceInformations`, `getInstanceInfo`), local tools and FD04 writes (`startProcess`, `completeTask`). Every write stops as **PREPARED — NOT SUBMITTED** until the operator approves it, or approves all writes of one run.
+- `server/iterop/simulator.ts`: an in-memory **synthetic** process engine. Its responses, documented errors (201 with no body, robot-only 400, signature 403, 404s) and request schemas mirror FD04. `server/iterop/drive.ts` holds the verified operation inventory and the operations that are never called.
+- `server/iterop/chain.ts` and `docs/iterop/lab/*.bpmn`: two neutral test processes, _Liquid cooling configuration chain_ (with reviewer rejection and rework loop) and _Candidate requirement intake_, importable as BPMN 2.0. `server/iterop/configurators.ts` holds **illustrative** tools; they produce no engineering values.
+- **Orchestration** view: command bar, chain canvas, per-call trace with request and response, approval card, simulated reviewer, and before/after diff. MCP adds `lab_run_command`, `lab_approve_write` and `lab_cancel_run` in synthetic mode only. Reviewer sign-off is never exposed to a model.
+- **No live drive transport exists.** `POST /api/lab/runs` refuses `source: live`. See `docs/iterop/LAB-ORCHESTRATION.md` for the sandbox-tenant route and its preconditions.
+
 ## NOVA-003 — ITEROP first (7 October 2026)
 
 - `server/iterop/`: a dedicated ITEROP connector with its own origin, credential, contract and probe. Its operation inventory holds the three R2026x-FD04 P0 operations: `getAllStartableProcesses`, `getTasksByUser` and `getBasicProcessInfo`. A contract can bind only those operationIds; paths come from the inventory.

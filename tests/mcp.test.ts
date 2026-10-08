@@ -21,12 +21,41 @@ test('MCP stdio exposes bounded read tools and returns labelled synthetic eviden
   try {
     await client.connect(transport);
     const tools = await client.listTools();
-    assert.equal(tools.tools.length, 11);
+    assert.equal(tools.tools.length, 14);
     assert.ok(tools.tools.some((t) => t.name === 'iterop_list_my_tasks'));
     assert.ok(tools.tools.some((t) => t.name === 'iterop_get_process_summary'));
     assert.ok(!tools.tools.some((t) => /catalog|start_process/.test(t.name)));
-    assert.ok(tools.tools.every((t) => t.annotations?.readOnlyHint === true));
-    assert.ok(!tools.tools.some((t) => /submit|delete|commit|execute|request/i.test(t.name)));
+    const lab = tools.tools.filter((t) => t.name.startsWith('lab_'));
+    assert.deepEqual(lab.map((t) => t.name).sort(), [
+      'lab_approve_write',
+      'lab_cancel_run',
+      'lab_run_command',
+    ]);
+    // Only the synthetic lab tools may write; everything else stays read-only.
+    assert.ok(
+      tools.tools
+        .filter((t) => !t.name.startsWith('lab_'))
+        .every((t) => t.annotations?.readOnlyHint === true),
+    );
+    assert.ok(lab.every((t) => /SYNTHETIC PROCESS ENGINE ONLY/.test(t.description ?? '')));
+    assert.ok(!tools.tools.some((t) => /sign|submit|delete|commit|execute|request/i.test(t.name)));
+    const labRun = await client.callTool({
+      name: 'lab_run_command',
+      arguments: {
+        prompt: 'Configure the cooling chain for 1 MW, 30 °C facility water, 10 racks',
+        approval: 'each',
+      },
+    });
+    const prepared = JSON.parse((labRun.content as { type: string; text: string }[])[0].text);
+    assert.equal(prepared.status, 'awaiting_approval');
+    assert.equal(prepared.pendingWrite.operationId, 'startProcess');
+    const approved = await client.callTool({
+      name: 'lab_approve_write',
+      arguments: { runId: prepared.runId, stepId: prepared.pendingWrite.stepId, all: true },
+    });
+    const done = JSON.parse((approved.content as { type: string; text: string }[])[0].text);
+    assert.equal(done.status, 'awaiting_signoff');
+    assert.equal(done.source, 'synthetic');
     const result = await client.callTool({
       name: 'search_engineering_items',
       arguments: { query: 'SYN-COOL-100' },

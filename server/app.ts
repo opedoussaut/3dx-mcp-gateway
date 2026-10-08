@@ -6,6 +6,10 @@ import { Gateway, GatewayError } from './gateway';
 import { MissionRunner } from './missions';
 import { IteropConnector } from './iterop/connector';
 import { iteropStatus, loadIteropConfig } from './iterop/config';
+import { Orchestrator } from './iterop/orchestrator';
+import { EngineError, SyntheticEngine } from './iterop/simulator';
+import { labOperations, neverCalled } from './iterop/drive';
+import { SPEC } from './iterop/operations';
 import type { Comparison, Mission } from '../shared/types';
 import { benchmarks } from '../shared/benchmarks';
 import corpus from '../docs/blueprint/benchmarks/fixtures/synthetic-engineering-corpus.json';
@@ -38,7 +42,24 @@ const observationInput = z
       .strict(),
   })
   .strict();
+const labRunInput = z
+  .object({
+    prompt: z.string().trim().min(3).max(1000),
+    approval: z.enum(['each', 'all']).default('each'),
+    source: z.enum(['synthetic', 'live']).default('synthetic'),
+  })
+  .strict();
+const labApproveInput = z.object({ stepId: z.uuid(), all: z.boolean().default(false) }).strict();
+const labReviewInput = z
+  .object({
+    taskId: z.string().min(1).max(200),
+    decision: z.string().min(1).max(40),
+    comment: z.string().max(1000).default(''),
+  })
+  .strict();
+type Lab = { engine: SyntheticEngine; orchestrator: Orchestrator };
 type Session = {
+  lab?: Lab;
   missions: Mission[];
   comparisons: Comparison[];
   count: number;
@@ -122,6 +143,82 @@ export function createApp(
   app.get('/api/iterop/flows', (_req, res) => {
     const { notice, placements, ...flows } = iteropFixture.flows;
     res.json({ source: 'synthetic', illustration: true, notice, flows, placements });
+  });
+  // ── Process orchestration lab: SYNTHETIC engine only. No live drive transport exists. ──
+  const lab = (session: Session) => {
+    if (!session.lab) {
+      const engine = new SyntheticEngine();
+      session.lab = { engine, orchestrator: new Orchestrator(engine) };
+    }
+    return session.lab;
+  };
+  const labState = (l: Lab) => ({
+    source: 'synthetic' as const,
+    specRelease: SPEC.release,
+    operations: Object.values(labOperations),
+    neverCalled,
+    runs: l.orchestrator.runs,
+    reviewerQueue: l.engine.reviewerQueue(),
+  });
+  const labError = (res: express.Response, e: unknown) => {
+    if (e instanceof EngineError)
+      return res
+        .status(e.status >= 400 && e.status < 500 ? e.status : 500)
+        .json({ error: e.message });
+    throw e;
+  };
+  app.get('/api/lab', (_req, res) => res.json(labState(lab(res.locals.session as Session))));
+  app.post('/api/lab/runs', (req, res) => {
+    const parsed = labRunInput.safeParse(req.body);
+    if (!parsed.success)
+      return res.status(400).json({ error: 'Write a command of 3–1,000 characters.' });
+    if (parsed.data.source === 'live')
+      return res.status(409).json({
+        error:
+          'Live process control is not authorized: there is no reviewed drive contract, credential or approval path. No request was made.',
+      });
+    const l = lab(res.locals.session as Session);
+    try {
+      const run = l.orchestrator.start(parsed.data.prompt, parsed.data.approval);
+      res.json({ run, state: labState(l) });
+    } catch (e) {
+      labError(res, e);
+    }
+  });
+  app.post('/api/lab/runs/:id/approve', (req, res) => {
+    const parsed = labApproveInput.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Name the step to approve.' });
+    const l = lab(res.locals.session as Session);
+    try {
+      const run = l.orchestrator.approve(req.params.id, parsed.data.stepId, parsed.data.all);
+      res.json({ run, state: labState(l) });
+    } catch (e) {
+      labError(res, e);
+    }
+  });
+  app.post('/api/lab/runs/:id/cancel', (req, res) => {
+    const l = lab(res.locals.session as Session);
+    try {
+      const run = l.orchestrator.cancel(req.params.id);
+      res.json({ run, state: labState(l) });
+    } catch (e) {
+      labError(res, e);
+    }
+  });
+  // SIMULATED reviewer action in the process application. Not an API NOVA can call on a platform.
+  app.post('/api/lab/review', (req, res) => {
+    const parsed = labReviewInput.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Choose a task and a decision.' });
+    const l = lab(res.locals.session as Session);
+    try {
+      const task = l.engine.reviewerQueue().find((t) => t.id === parsed.data.taskId);
+      if (!task || !task.decisions.includes(parsed.data.decision))
+        return res.status(400).json({ error: 'Choose one of the task’s decisions.' });
+      l.engine.signAsReviewer(parsed.data.taskId, parsed.data.decision, parsed.data.comment);
+      res.json({ state: labState(l) });
+    } catch (e) {
+      labError(res, e);
+    }
   });
   app.get('/api/registry', (_req, res) =>
     res.json(
@@ -262,6 +359,7 @@ export function createApp(
         .json({ error: 'Wait for the active mission before clearing the session.' });
     s.missions = [];
     s.comparisons = [];
+    s.lab = undefined;
     res.json({ ok: true });
   });
   app.use('/api', (_req, res) => res.status(404).json({ error: 'API route not found.' }));

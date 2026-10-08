@@ -179,3 +179,76 @@ export type FlowIllustrations = {
   /** SYNTHETIC illustration only: which stage a synthetic task sits in. */
   placements: Record<string, string>;
 };
+
+/** Process orchestration (lab). Synthetic engine unless a reviewed sandbox drive contract admits live. */
+export type OrchestrationStepKind = 'read' | 'drive' | 'compute' | 'human';
+export type OrchestrationStepStatus =
+  'pending' | 'awaiting_approval' | 'done' | 'blocked' | 'failed' | 'skipped';
+export type OrchestrationStep = {
+  id: string;
+  kind: OrchestrationStepKind;
+  title: string;
+  stage?: string;
+  operationId?: string;
+  method?: 'GET' | 'POST';
+  path?: string;
+  status: OrchestrationStepStatus;
+  request?: unknown;
+  response?: unknown;
+  outcome?: string;
+  at?: string;
+};
+export type OrchestrationStatus =
+  | 'awaiting_approval'
+  | 'awaiting_signoff'
+  | 'completed'
+  | 'needs_input'
+  | 'blocked'
+  | 'failed'
+  | 'cancelled';
+export type OrchestrationStage = {
+  id: string;
+  label: string;
+  kind: 'start' | 'automated' | 'human';
+  tool?: string;
+};
+export type OrchestrationChange = {
+  field: string;
+  label: string;
+  before: string;
+  after: string;
+  changed: boolean;
+};
+export type OrchestrationRun = {
+  id: string;
+  number: number;
+  prompt: string;
+  createdAt: string;
+  source: Source;
+  intent:
+    | 'configure'
+    | 'recalculate'
+    | 'requirement'
+    | 'tasks'
+    | 'status'
+    | 'processes'
+    | 'refused'
+    | 'unknown';
+  status: OrchestrationStatus;
+  summary: string;
+  approval: 'each' | 'all';
+  processKey?: string;
+  processName?: string;
+  identificator?: string;
+  instanceId?: string;
+  inputs?: Record<string, string | number>;
+  stages: OrchestrationStage[];
+  stageState: Record<string, 'pending' | 'active' | 'done' | 'awaiting' | 'human' | 'failed'>;
+  stageNotes: Record<string, string>;
+  steps: OrchestrationStep[];
+  outputs: { field: string; label: string; value: string }[];
+  findings: string[];
+  missing: string[];
+  changes: OrchestrationChange[];
+  records: { id: string; title: string; detail: string }[];
+};
