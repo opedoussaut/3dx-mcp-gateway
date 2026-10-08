@@ -39,6 +39,8 @@ export type ProcessDefinition = {
   version: number;
   icon: string;
   identificatorPrefix: string;
+  /** Name of the BPMN start event; the designer derives start-form variable ids from it. */
+  startElement: string;
   startVariables: VariableDefinition[];
   tasks: TaskDefinition[];
   /** Task routed back to the operator when the signature task is rejected. */
@@ -65,6 +67,7 @@ export const definitions: readonly ProcessDefinition[] = [
     version: 1,
     icon: 'thermometer',
     identificatorPrefix: 'COOL',
+    startElement: 'Operating envelope',
     startVariables: [
       v('start_itLoadKw', 'IT heat load', 'DECIMAL', 'Heat to remove from the racks.', {
         min: '50',
@@ -200,6 +203,7 @@ export const definitions: readonly ProcessDefinition[] = [
     version: 1,
     icon: 'file-check',
     identificatorPrefix: 'REQ',
+    startElement: 'Candidate',
     startVariables: [
       v('start_statement', 'Requirement statement', 'TEXT_AREA', 'The candidate requirement.', {
         min: '10',

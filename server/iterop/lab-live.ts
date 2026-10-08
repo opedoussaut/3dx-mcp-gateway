@@ -46,6 +46,13 @@ export const labContractSchema = z
     apiVersion: z.literal(SPEC.apiVersion),
     /** FD04 server template `{APIGateway}/api/businessprocess/v2`, confirmed on the API card. */
     gatewayBasePath: z.literal('/api/businessprocess/v2'),
+    /** Optional lab field id → tenant variable id, for ids the naming rule cannot derive. */
+    variableIds: z
+      .record(
+        z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,99}$/),
+        z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,199}$/),
+      )
+      .default({}),
     /** Lab process key → key the tenant gave the imported model. */
     processKeys: z
       .object({ [COOLING_CHAIN]: tenantKey, [REQUIREMENT_INTAKE]: tenantKey.optional() })
@@ -251,8 +258,14 @@ const check = <T>(schema: z.ZodType<T>, body: unknown, op: string): T => {
 };
 
 type ProcessInfo = z.infer<typeof processInfoResponse>;
-type VariableMap = { toTenant: Map<string, string>; toLab: Map<string, string> };
+type VariableMap = {
+  toTenant: Map<string, string>;
+  toLab: Map<string, string>;
+  source: 'definition' | 'derived';
+};
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+const generatedPart = (tenantId: string) => norm(tenantId.slice(tenantId.lastIndexOf('_') + 1));
+const fieldPart = (labId: string) => labId.slice(labId.lastIndexOf('_') + 1);
 /**
  * The designer generates variable ids as `<element>_<camelCaseName>` (a field named
  * `start_itLoadKw` on "Operating envelope" becomes `operatingEnvelope_startItloadkw`). A tenant id
@@ -261,12 +274,45 @@ const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
  */
 export const matchesField = (tenantId: string, labId: string) => {
   if (tenantId === labId) return true;
-  const generated = norm(tenantId.slice(tenantId.lastIndexOf('_') + 1));
-  return (
-    generated !== '' &&
-    (generated === norm(labId) || generated === norm(labId.slice(labId.lastIndexOf('_') + 1)))
-  );
+  const generated = generatedPart(tenantId);
+  return generated !== '' && (generated === norm(labId) || generated === norm(fieldPart(labId)));
 };
+/** One unambiguous match: the full lab id first, then the field part alone. */
+function pick<T>(items: T[], full: (x: T) => boolean, partial: (x: T) => boolean) {
+  const f = items.filter(full);
+  if (f.length === 1) return f[0];
+  const p = items.filter(partial);
+  return p.length === 1 ? p[0] : undefined;
+}
+export const tenantIdFor = (labId: string, tenantIds: string[]) =>
+  pick(
+    tenantIds,
+    (t) => t === labId || generatedPart(t) === norm(labId),
+    (t) => generatedPart(t) === norm(fieldPart(labId)),
+  );
+export const labIdFor = (tenantId: string, labIds: string[]) =>
+  pick(
+    labIds,
+    (l) => l === tenantId || generatedPart(tenantId) === norm(l),
+    (l) => generatedPart(tenantId) === norm(fieldPart(l)),
+  );
+/** The designer's camel-casing, observed on the tenant: element ids are cut at 26 characters. */
+export const camelId = (name: string, max = 200) =>
+  name
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
+    .map((w, i) => (i === 0 ? w.toLowerCase() : w[0].toUpperCase() + w.slice(1).toLowerCase()))
+    .join('')
+    .slice(0, max);
+export const derivedVariableId = (element: string, field: string) =>
+  `${camelId(element, 26)}_${camelId(field)}`;
+const allLabFields = (d: ProcessDefinition) => [
+  ...d.startVariables.map((v) => v.id),
+  ...[...d.tasks, ...(d.rework ? [d.rework] : [])].flatMap((t) =>
+    t.expectedFields.map((f) => f.id),
+  ),
+];
+
 /** Resolve every lab field of one process to the id the tenant model declares, task by task. */
 export function resolveVariables(def: ProcessDefinition, info: ProcessInfo) {
   const toTenant = new Map<string, string>();
@@ -278,7 +324,7 @@ export function resolveVariables(def: ProcessDefinition, info: ProcessInfo) {
     ids.forEach((x) => taskOutputIds.add(x));
     const absent: string[] = [];
     for (const f of t.expectedFields) {
-      const found = ids.find((x) => matchesField(x, f.id));
+      const found = tenantIdFor(f.id, ids);
       if (found) toTenant.set(f.id, found);
       else if (f.required) absent.push(f.id);
     }
@@ -288,7 +334,7 @@ export function resolveVariables(def: ProcessDefinition, info: ProcessInfo) {
   const startCandidates = Object.keys(info.variables ?? {}).filter((x) => !taskOutputIds.has(x));
   const absentStart: string[] = [];
   for (const v of def.startVariables) {
-    const found = startCandidates.find((x) => matchesField(x, v.id));
+    const found = tenantIdFor(v.id, startCandidates);
     if (found) toTenant.set(v.id, found);
     else if (v.required) absentStart.push(v.id);
   }
@@ -318,39 +364,72 @@ export class LiveEngine implements ProcessEngine {
   refreshVariables() {
     this.variables = undefined;
   }
-  private async variableMap(): Promise<VariableMap> {
+  /**
+   * Start-form ids: from the deployed definition when this account may read it (getProcessInfo),
+   * otherwise derived from the designer's naming rule. Contract overrides win in both cases.
+   */
+  private async variableMap(): Promise<VariableMap & { source: 'definition' | 'derived' }> {
     this.variables ??= (async () => {
       const toTenant = new Map<string, string>();
-      for (const d of definitions)
-        if (this.admits(d.key))
+      let source: 'definition' | 'derived' = 'definition';
+      for (const d of definitions) {
+        if (!this.admits(d.key)) continue;
+        try {
           for (const [a, b] of resolveVariables(d, await this.getProcessInfo(d.key)).toTenant)
             toTenant.set(a, b);
-      return { toTenant, toLab: new Map([...toTenant].map(([a, b]) => [b, a])) };
+        } catch (e) {
+          if (!(e instanceof EngineError) || e.status !== 403) throw e;
+          // Run-only accounts may not read the design definition: derive the start-form ids.
+          source = 'derived';
+          for (const v of d.startVariables)
+            toTenant.set(v.id, derivedVariableId(d.startElement, v.id));
+        }
+      }
+      for (const [a, b] of Object.entries(this.contract.variableIds)) toTenant.set(a, b);
+      return { toTenant, toLab: new Map([...toTenant].map(([a, b]) => [b, a])), source };
     })().catch((e) => {
       this.variables = undefined;
       throw e;
     });
     return this.variables;
   }
-  private async toTenantData(data: Record<string, unknown>, required: Set<string>) {
-    const { toTenant } = await this.variableMap();
+  async variableSource() {
+    const m = await this.variableMap();
+    return { source: m.source, start: [...m.toTenant] };
+  }
+  private async labIds<T extends { id?: string }>(items: T[] | undefined) {
+    const { toLab } = await this.variableMap();
+    const labs = definitions.filter((d) => this.admits(d.key)).flatMap(allLabFields);
+    return items?.map((i) => ({
+      ...i,
+      id: (i.id && (toLab.get(i.id) ?? labIdFor(i.id, labs))) ?? i.id,
+    }));
+  }
+  private tenantData(
+    data: Record<string, unknown>,
+    resolve: (labId: string) => string | undefined,
+    required: Set<string>,
+  ) {
     const out: Record<string, unknown> = {};
     const unknown: string[] = [];
     for (const [k, v] of Object.entries(data)) {
-      const id = toTenant.get(k);
+      const id = resolve(k);
       if (id) out[id] = v;
       else if (required.has(k)) unknown.push(k);
     }
     if (unknown.length)
       throw new EngineError(
         400,
-        `The tenant model declares no field for ${unknown.join(', ')}. Run the connection test.`,
+        `The tenant model declares no field for ${unknown.join(', ')}. Check the field names in the designer.`,
       );
     return out;
   }
-  private async labIds<T extends { id?: string }>(items: T[] | undefined) {
-    const { toLab } = await this.variableMap();
-    return items?.map((i) => ({ ...i, id: (i.id && toLab.get(i.id)) ?? i.id }));
+  private async rawTask(taskId: string) {
+    return check(
+      taskInstanceResponse,
+      await this.http.call('getTaskInstanceInformations', { taskId: taskIdOf(taskId) }),
+      'getTaskInstanceInformations',
+    );
   }
   private tenant(labKey: string) {
     const key = this.toTenant.get(labKey);
@@ -396,11 +475,7 @@ export class LiveEngine implements ProcessEngine {
   }
   /** Field ids are returned under NOVA's lab ids, so the orchestrator never sees tenant ids. */
   async getTaskInstanceInformations(taskId: string) {
-    const body = check(
-      taskInstanceResponse,
-      await this.http.call('getTaskInstanceInformations', { taskId: taskIdOf(taskId) }),
-      'getTaskInstanceInformations',
-    );
+    const body = await this.rawTask(taskId);
     return {
       ...body,
       expectedFields: await this.labIds(body.expectedFields),
@@ -426,7 +501,8 @@ export class LiveEngine implements ProcessEngine {
       if (!allowedVars.has(k))
         throw new EngineError(400, `${k} is not a start variable of the lab process.`);
     const required = new Set(def?.startVariables.filter((v) => v.required).map((v) => v.id));
-    const data = await this.toTenantData(parsed.data.data ?? {}, required);
+    const { toTenant } = await this.variableMap();
+    const data = this.tenantData(parsed.data.data ?? {}, (k) => toTenant.get(k), required);
     await this.http.call(
       'startProcess',
       { processKey: this.tenant(labKey) },
@@ -440,7 +516,7 @@ export class LiveEngine implements ProcessEngine {
     if (!parsed.success || parsed.data.user !== undefined)
       throw new EngineError(400, 'NOVA never sends user.');
     // Only tasks of an admitted lab process, re-read from the platform just before the write.
-    const info = await this.getTaskInstanceInformations(taskId);
+    const info = await this.rawTask(taskId);
     const known = new Set(
       definitions
         .flatMap((d) => [...d.tasks, ...(d.rework ? [d.rework] : [])])
@@ -454,7 +530,16 @@ export class LiveEngine implements ProcessEngine {
         .filter((t) => sameTask(t.name, info.name))
         .flatMap((t) => t.expectedFields.filter((f) => f.required).map((f) => f.id)),
     );
-    const data = await this.toTenantData(parsed.data.data ?? {}, required);
+    // The task's own form names its fields: resolve each lab field against it.
+    const formIds = (info.expectedFields ?? [])
+      .map((f) => f.id)
+      .filter((x): x is string => Boolean(x));
+    const override = this.contract.variableIds;
+    const data = this.tenantData(
+      parsed.data.data ?? {},
+      (k) => override[k] ?? tenantIdFor(k, formIds),
+      required,
+    );
     await this.http.call('completeTask', { taskId: taskIdOf(taskId) }, { ...parsed.data, data });
     return { status: 200 as const };
   }
@@ -506,7 +591,23 @@ export async function probeLive(engine: LiveEngine): Promise<ProbeResult> {
           ? 'getAllStartableProcesses'
           : 'not in the agent’s startable list: deploy it and add the agent’s user as initiator',
       );
-      const info = await engine.getProcessInfo(d.key);
+      let info: Awaited<ReturnType<LiveEngine['getProcessInfo']>> | undefined;
+      try {
+        info = await engine.getProcessInfo(d.key);
+      } catch (e) {
+        if (!(e instanceof EngineError) || e.status !== 403) throw e;
+      }
+      if (!info) {
+        // Run-only account: the design definition is not readable. That is expected least privilege.
+        const start = d.startVariables.map((v) => derivedVariableId(d.startElement, v.id));
+        record(
+          'Process definition',
+          true,
+          'not readable by this account (run rights only, 403): start-form ids derived from the designer naming rule; each task form is checked before NOVA writes',
+        );
+        record(`${d.name} start form`, true, `will send ${start.join(', ')}`);
+        continue;
+      }
       const { toTenant, missing } = resolveVariables(d, info);
       for (const scope of [
         'start form',
