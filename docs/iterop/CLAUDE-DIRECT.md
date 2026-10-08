@@ -33,7 +33,7 @@ There is no tool for signing, reassigning, stopping, deleting, deploying or righ
 
 In both modes the "Check system limits" task accepts only the independent check's result, and sign-off is always a person in ITEROP.
 
-**Approvals:** the two write tools are marked destructive. Claude Desktop and Claude Code therefore ask you before each call, and the `iterop-orchestrator` skill tells Claude to show the values and ask first. Keep the tool permission on **Ask**. With "Always allow", Claude writes without asking, and the connector cannot detect that. In Claude Code, the repository's `.claude/settings.json` adds an **ask** rule for both write tools (in `final` mode, remove those two lines locally or Claude Code will still prompt for each write), so they prompt even when the session would otherwise approve calls itself (auto mode); still prefer the default or Ask mode for live runs. That is the trade-off against the NOVA version, where a person clicks **Approve** in the NOVA page.
+**One setting:** `ITEROP_MCP_REVIEW` alone decides how writes are reviewed. In `step` mode, Claude asks the expert in the chat before each stage. In `final` mode, it runs the automated stages and the result is validated at the ITEROP sign-off. The two write tools are also flagged as writes, so a Claude client may show its own permission prompt depending on its permission mode. That prompt is extra protection, not the review itself. For a strict `step` demo, use Claude's default ("ask") permission mode rather than auto mode.
 
 ## Setup
 
