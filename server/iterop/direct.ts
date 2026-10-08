@@ -1,7 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { definition, definitions, sameTask, type ProcessDefinition } from './chain';
-import { cdu, coolant, LIMITS, loop, validator, type ChainInputs } from './configurators';
+import { LIMITS } from './configurators';
+import { checkProposal, type Envelope, type Proposal } from './proposal-check';
 import { EngineError, type ProcessEngine } from './simulator';
 
 /**
@@ -30,6 +31,13 @@ export type DirectOptions = {
   /** Processes admitted by the reviewed contract (lab keys). */
   processes: string[];
   blockers?: string[];
+  /**
+   * Who reviews the automated steps (operator setting, never the model's):
+   * `step` — an expert confirms each stage before it is written (default);
+   * `final` — Claude completes the automated stages; a person validates the final result at the
+   * sign-off task in ITEROP.
+   */
+  review?: 'step' | 'final';
   now?: () => Date;
 };
 
@@ -65,6 +73,11 @@ const field = (f: ProcessDefinition['startVariables'][number]) => ({
 
 export function registerDirectTools(server: McpServer, o: DirectOptions) {
   const live = o.engine.source === 'live';
+  const review = o.review ?? 'step';
+  const reviewRule =
+    review === 'final'
+      ? 'Review mode FINAL: complete the automated stages without asking for each one; the person validates the final result at the sign-off task in ITEROP. Stop and ask if the check stays FAIL or REVIEW.'
+      : 'Review mode STEP: before each write, show that stage’s values and reasoning and wait for the expert to confirm or correct them.';
   const engineLabel = live ? 'SANDBOX (live ITEROP)' : 'SIMULATED (no platform request)';
   const note = live
     ? 'Live sandbox ITEROP through the API Gateway; synthetic test processes only.'
@@ -124,8 +137,8 @@ export function registerDirectTools(server: McpServer, o: DirectOptions) {
         ready: !o.blockers?.length,
         blockers: o.blockers ?? [],
         processes: o.processes,
-        writes:
-          'iterop_start_process and iterop_complete_task change ITEROP; ask the user before each.',
+        reviewMode: review,
+        reviewRule,
         neverPossible: ['sign', 'reassign', 'stop', 'delete', 'deploy', 'change rights'],
       }),
   );
@@ -172,7 +185,11 @@ export function registerDirectTools(server: McpServer, o: DirectOptions) {
             doneBy: t.signature
               ? 'a person in ITEROP (signature task — this connector cannot complete it)'
               : 'this connector, after the user approves',
-            calculator: t.tool ? 'cooling_calculate' : undefined,
+            proposedBy: t.tool
+              ? t.tool === 'validator'
+                ? 'cooling_check (independent check)'
+                : 'you (Claude), then verified with cooling_check'
+              : undefined,
             rework: 'rework' in t ? true : undefined,
             fields: t.expectedFields.map(field),
           })),
@@ -232,41 +249,49 @@ export function registerDirectTools(server: McpServer, o: DirectOptions) {
       blocked() ?? guard(async () => ({ instance: await o.engine.getInstanceInfo(instanceId) })),
   );
 
+  // Check results this session issued: only these may be written to "Check system limits".
+  const issuedChecks = new Set<string>();
+  const num = z.number().finite();
   server.registerTool(
-    'cooling_calculate',
+    'cooling_check',
     {
       description:
-        'Illustrative cooling calculator for the lab chain (no platform request). Returns the field values for Select coolant, Size coolant distribution units, Configure secondary loop and Check system limits, keyed by field id. NOT engineering values.',
+        'Independent check of a cooling configuration YOU proposed (no platform request): energy balance, declared lab limits, redundancy arithmetic, property plausibility. Returns PASS / REVIEW / FAIL with findings, and the exact values to write to the "Check system limits" task — that task accepts only values produced here. Lab limits are illustrative.',
       inputSchema: {
-        itLoadKw: z.number().min(50).max(20000),
-        facilityWaterC: z.number().min(10).max(45),
-        rackCount: z.number().int().min(1).max(500),
-        redundancy: z.enum(['N', 'N+1', '2N']).default('N+1'),
-        coolant: z.enum(['auto', 'water', 'PG25']).default('auto'),
+        envelope: z.object({
+          itLoadKw: num.min(50).max(20000),
+          facilityWaterC: num.min(10).max(45),
+          rackCount: z.number().int().min(1).max(500),
+          redundancy: z.enum(['N', 'N+1', '2N']),
+        }),
+        proposal: z.object({
+          coolantSelection_fluid: z.string().min(1).max(100),
+          coolantSelection_cp: num.describe('kJ/(kg·K)'),
+          coolantSelection_density: num.describe('kg/m³'),
+          cduSizing_model: z.string().min(1).max(100),
+          cduCapacityKw: num.positive().describe('Rated capacity of one CDU, kW'),
+          cduSizing_units: z.number().int().min(1),
+          cduSizing_dutyUnits: z.number().int().min(1),
+          cduSizing_utilisation: num.describe('% of duty capacity used'),
+          loopConfiguration_supplyC: num,
+          loopConfiguration_returnC: num,
+          loopConfiguration_flowLpm: num.positive(),
+          loopConfiguration_rackFlowLpm: num.positive(),
+        }),
       },
       annotations: { ...read, openWorldHint: false },
     },
-    async (input: ChainInputs) => {
-      const fluid = coolant(input);
-      const unit = cdu(input);
-      const loopFields = loop(input, fluid);
-      return text({
-        illustrative: true,
-        limits: LIMITS,
-        tasks: {
-          'Select coolant': fluid,
-          'Size coolant distribution units': unit,
-          'Configure secondary loop': loopFields,
-          'Check system limits': validator(input, unit, loopFields),
-        },
-      });
+    async ({ envelope, proposal }: { envelope: Envelope; proposal: Proposal }) => {
+      const check = checkProposal(envelope, proposal);
+      issuedChecks.add(JSON.stringify(check.checkTaskValues));
+      return text({ ...check, limits: LIMITS, illustrativeLimits: true });
     },
   );
 
   server.registerTool(
     'iterop_start_process',
     {
-      description: `${note} WRITE — starts a lab process instance in ITEROP (startProcess). Ask the user to confirm the process and values first. Values are keyed by the start-form field ids from iterop_get_process_model. Returns the run reference and the first open task.`,
+      description: `${note} WRITE — starts a lab process instance in ITEROP (startProcess). Follow the review mode from iterop_connection. Values are keyed by the start-form field ids from iterop_get_process_model. Returns the run reference and the first open task.`,
       inputSchema: {
         processKey: z.string().min(1).max(100),
         values: z.record(z.string().max(100), value),
@@ -310,7 +335,7 @@ export function registerDirectTools(server: McpServer, o: DirectOptions) {
   server.registerTool(
     'iterop_complete_task',
     {
-      description: `${note} WRITE — completes one of this connector's tasks in ITEROP (completeTask). Ask the user to confirm the values first. Values are keyed by the task's field ids. Signature tasks are refused: a person signs in ITEROP.`,
+      description: `${note} WRITE — completes one of this connector's tasks in ITEROP (completeTask). Follow the review mode from iterop_connection. Values are keyed by the task's field ids. Signature tasks are refused: a person signs in ITEROP.`,
       inputSchema: {
         taskId: z.string().min(1).max(200),
         values: z.record(z.string().max(100), value),
@@ -329,6 +354,20 @@ export function registerDirectTools(server: McpServer, o: DirectOptions) {
           throw new EngineError(
             403,
             `“${task.name}” is a signature task: a person signs it in ITEROP.`,
+          );
+        // Claude must not grade its own proposal: the check task takes only cooling_check output.
+        if (
+          taskDefinition(d, task.name)?.id === 'systemCheck' &&
+          !issuedChecks.has(
+            JSON.stringify({
+              systemCheck_result: values.systemCheck_result,
+              systemCheck_findings: values.systemCheck_findings,
+            }),
+          )
+        )
+          throw new EngineError(
+            400,
+            '“Check system limits” accepts only the checkTaskValues returned by cooling_check for the proposal you used.',
           );
         await o.engine.completeTask(taskId, { data: values });
         const next = (await myTasks()).lab.find(

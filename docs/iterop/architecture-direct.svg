@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" width="1200" height="720" role="img" aria-labelledby="t d" font-family="Inter, 'Segoe UI', Roboto, Arial, sans-serif">
+  <title id="t">claude-iterop-orchestrator architecture</title>
+  <desc id="d">Claude, signed in with the user's account and guided by the iterop-orchestrator skill, engineers the configuration and calls one local MCP connector. The connector holds the credentials, exposes nine fixed tools, checks Claude's proposal independently and talks to the sandbox ITEROP through the API Gateway. An expert reviews in the Claude chat, step by step or at the end; an engineer signs off in ITEROP Play.</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#1768a4"/>
+    </marker>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#0b6a6e"/>
+    </marker>
+    <style>
+      .box{fill:#fff;stroke:#d9e3ea;stroke-width:1.2}
+      .key{fill:#f0f6fb;stroke:#9cc2df;stroke-width:1.2}
+      .safe{fill:#f3fafa;stroke:#a9d9da;stroke-width:1.2}
+      .h{font-size:15px;font-weight:650;fill:#10283f}
+      .s{font-size:12.5px;fill:#5b6b7a}
+      .m{font-size:11px;font-weight:600;fill:#1768a4;letter-spacing:.06em}
+      .lab{font-size:11.5px;fill:#1768a4;font-weight:600}
+      .col{font-size:12px;font-weight:700;fill:#5b6b7a;letter-spacing:.08em}
+      .ln{stroke:#1768a4;stroke-width:1.6;fill:none}
+      .lg{stroke:#0b6a6e;stroke-width:1.6;fill:none;stroke-dasharray:5 4}
+      .item{font-size:12.5px;fill:#172b3d}
+    </style>
+  </defs>
+  <rect width="1200" height="720" fill="#f5f8fa"/>
+
+  <text x="24" y="40" class="col">PEOPLE &amp; CLAUDE</text>
+  <text x="290" y="40" class="col">YOUR COMPUTER · ONE LOCAL PROCESS</text>
+  <text x="810" y="40" class="col">SANDBOX TENANT · SYNTHETIC TEST PROCESSES</text>
+
+  <rect x="290" y="56" width="484" height="560" rx="18" fill="#eef3f7" stroke="#c9d6e0" stroke-dasharray="6 5"/>
+  <rect x="810" y="56" width="366" height="560" rx="18" fill="#eef3f7" stroke="#c9d6e0" stroke-dasharray="6 5"/>
+
+  <!-- people & Claude -->
+  <rect x="24" y="86" width="226" height="150" rx="14" class="key"/>
+  <text x="40" y="112" class="m">1 · ASK · ENGINEER</text>
+  <text x="40" y="134" class="h">Claude</text>
+  <text x="40" y="154" class="s">Desktop or Code, your account.</text>
+  <text x="40" y="172" class="s">Plans the run, designs the</text>
+  <text x="40" y="190" class="s">configuration, explains it.</text>
+  <text x="40" y="212" class="s">Guided by the skill</text>
+  <text x="40" y="228" class="s" font-weight="600">iterop-orchestrator</text>
+
+  <rect x="24" y="284" width="226" height="126" rx="14" class="box"/>
+  <text x="40" y="310" class="m">2 · REVIEW (IN THE CHAT)</text>
+  <text x="40" y="332" class="h">You / the expert</text>
+  <text x="40" y="352" class="s">step: confirm or correct</text>
+  <text x="40" y="368" class="s">each stage before it is written.</text>
+  <text x="40" y="388" class="s">final: Claude runs the steps,</text>
+  <text x="40" y="404" class="s">you judge the result (6).</text>
+
+  <rect x="24" y="448" width="226" height="112" rx="14" class="box"/>
+  <text x="40" y="474" class="m">6 · SIGN OFF</text>
+  <text x="40" y="496" class="h">Engineer</text>
+  <text x="40" y="516" class="s">Approves or rejects in ITEROP.</text>
+  <text x="40" y="534" class="s">Reject → rework back to Claude.</text>
+  <text x="40" y="550" class="s">Nothing is official before this.</text>
+
+  <!-- connector -->
+  <rect x="314" y="86" width="436" height="330" rx="14" class="key"/>
+  <text x="330" y="112" class="m">3 · CONNECT · 4 · CHECK</text>
+  <text x="330" y="134" class="h">claude-iterop-orchestrator</text>
+  <text x="548" y="134" class="s">MCP server · 9 fixed tools</text>
+  <g class="item">
+    <rect x="328" y="150" width="408" height="38" rx="9" fill="#fff" stroke="#d9e3ea"/>
+    <text x="342" y="174">Read: processes · process model · my tasks · task · instance</text>
+    <rect x="328" y="196" width="408" height="38" rx="9" class="safe"/>
+    <text x="342" y="220" fill="#0b6a6e" font-weight="650">cooling_check — independent check of Claude’s design</text>
+    <rect x="328" y="242" width="408" height="38" rx="9" fill="#fff" stroke="#d9e3ea"/>
+    <text x="342" y="266">Write: start process · complete task (flagged as writes)</text>
+    <rect x="328" y="288" width="408" height="38" rx="9" fill="#fff" stroke="#d9e3ea"/>
+    <text x="342" y="312">Only lab processes and tasks reach Claude</text>
+    <rect x="328" y="334" width="408" height="38" rx="9" fill="#fff" stroke="#d9e3ea"/>
+    <text x="342" y="358">Refuses signature tasks · check task takes check result only</text>
+  </g>
+  <text x="330" y="400" class="s">Review mode and engine are set by you in .env, not by Claude.</text>
+
+  <rect x="314" y="448" width="436" height="112" rx="14" class="safe"/>
+  <text x="330" y="474" class="m" fill="#0b6a6e">SECRETS STAY HERE</text>
+  <text x="330" y="496" class="h">.env + lab contract</text>
+  <text x="330" y="516" class="s">API key, agent secret, ITEROP_MCP_ENGINE, ITEROP_MCP_REVIEW.</text>
+  <text x="330" y="534" class="s">Never sent to Claude or GitHub. No web server, no browser,</text>
+  <text x="330" y="550" class="s">no open network port.</text>
+
+  <!-- tenant -->
+  <rect x="834" y="86" width="318" height="150" rx="14" class="box"/>
+  <text x="850" y="112" class="m">5 · ENTER</text>
+  <text x="850" y="134" class="h">API Gateway</text>
+  <text x="850" y="154" class="s">HTTPS, API key + Openness Agent.</text>
+  <text x="850" y="172" class="s">NOVA's own robot account:</text>
+  <text x="850" y="190" class="s">non-admin, run rights only,</text>
+  <text x="850" y="208" class="s">revocable at any time.</text>
+
+  <rect x="834" y="284" width="318" height="126" rx="14" class="box"/>
+  <text x="850" y="310" class="m">PROCESS ENGINE</text>
+  <text x="850" y="332" class="h">ITEROP Business Process API</text>
+  <text x="850" y="352" class="s">Read processes and tasks · start a</text>
+  <text x="850" y="370" class="s">process · complete the robot's tasks.</text>
+  <text x="850" y="388" class="s">Nothing else is in the connector.</text>
+
+  <rect x="834" y="448" width="318" height="112" rx="14" class="box"/>
+  <text x="850" y="474" class="m">SYSTEM OF RECORD</text>
+  <text x="850" y="496" class="h">ITEROP Play</text>
+  <text x="850" y="516" class="s">Monitoring, history of who did what,</text>
+  <text x="850" y="534" class="s">human sign-off task.</text>
+  <text x="850" y="550" class="s">Claude gives you the direct link.</text>
+
+  <!-- arrows -->
+  <path d="M250 160H312" class="ln" marker-end="url(#a)" marker-start="url(#a)"/>
+  <text x="256" y="152" class="lab">MCP</text>
+  <path d="M137 238V282" class="ln" marker-end="url(#a)" marker-start="url(#a)"/>
+  <text x="146" y="265" class="lab">confirm · correct</text>
+  <path d="M532 448V418" class="lg" marker-end="url(#g)"/>
+  <path d="M750 160H832" class="ln" marker-end="url(#a)" marker-start="url(#a)"/>
+  <text x="764" y="152" class="lab">HTTPS</text>
+  <path d="M993 236V282" class="ln" marker-end="url(#a)" marker-start="url(#a)"/>
+  <path d="M993 410V446" class="ln" marker-end="url(#a)" marker-start="url(#a)"/>
+  <path d="M137 560V642H993V562" class="ln" marker-end="url(#a)"/>
+  <text x="430" y="634" class="lab">engineer signs in ITEROP Play (no tool can sign)</text>
+
+  <rect x="24" y="664" width="1152" height="40" rx="10" fill="#fcf4f3" stroke="#efd0cd"/>
+  <text x="40" y="689" font-size="13" fill="#b4322b" font-weight="650">Never possible from Claude:</text>
+  <text x="228" y="689" font-size="13" fill="#172b3d">sign · reassign · stop · delete · deploy · change rights · call any other address · see the credentials</text>
+</svg>

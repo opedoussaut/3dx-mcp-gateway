@@ -14,10 +14,13 @@ import { SyntheticEngine } from './iterop/simulator';
  *   ITEROP_MCP_ENGINE=simulated (default) — in-process simulated engine, no platform request.
  *   ITEROP_MCP_ENGINE=live — the sandbox tenant through the API Gateway, using the NOVA_LAB_*
  *   settings and the reviewed lab contract in .env. Credentials never reach Claude.
+ *   ITEROP_MCP_REVIEW=step (default) — an expert confirms each stage; final — Claude completes
+ *   the automated stages and a person validates the result at the ITEROP sign-off.
  */
 process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 if (existsSync('.env')) process.loadEnvFile('.env');
 
+const review = process.env.ITEROP_MCP_REVIEW === 'final' ? 'final' : 'step';
 const server = new McpServer({ name: 'claude-iterop-orchestrator', version: '0.1.0' });
 if (process.env.ITEROP_MCP_ENGINE === 'live') {
   const config = loadLabLiveConfig();
@@ -29,11 +32,13 @@ if (process.env.ITEROP_MCP_ENGINE === 'live') {
     processes: status.settings.processes,
     play: status.play?.instance,
     blockers: engine ? [] : config.blockers,
+    review,
   });
 } else {
   registerDirectTools(server, {
     engine: new SyntheticEngine(),
     processes: definitions.map((d) => d.key),
+    review,
   });
 }
 await server.connect(new StdioServerTransport());

@@ -45,24 +45,49 @@ async function driveChain(call: Awaited<ReturnType<typeof connect>>['call']) {
   assert.equal(started.started, true, JSON.stringify(started));
   assert.match(started.runReference, /^COOL-\d{6}-\d{6}$/);
   assert.equal(started.nextTask.task.replace(/^\[[^\]]*\]\s*/, ''), 'Select coolant');
-  const calc = await call('cooling_calculate', {
-    itLoadKw: 1200,
-    facilityWaterC: 32,
-    rackCount: 16,
-    redundancy: 'N+1',
+  // Claude's own engineering proposal for 1.2 MW, 32 °C water, 16 racks, N+1.
+  const proposal = {
+    coolantSelection_fluid: 'PG25',
+    coolantSelection_cp: 3.9,
+    coolantSelection_density: 1020,
+    cduSizing_model: 'CDU-500',
+    cduCapacityKw: 500,
+    cduSizing_units: 4,
+    cduSizing_dutyUnits: 3,
+    cduSizing_utilisation: 80,
+    loopConfiguration_supplyC: 35,
+    loopConfiguration_returnC: 45,
+    loopConfiguration_flowLpm: 1810,
+    loopConfiguration_rackFlowLpm: 113.1,
+  };
+  const check = await call('cooling_check', {
+    envelope: { itLoadKw: 1200, facilityWaterC: 32, rackCount: 16, redundancy: 'N+1' },
+    proposal,
   });
-  assert.equal(calc.illustrative, true);
+  assert.equal(check.result, 'PASS', JSON.stringify(check.findings));
+  const pick = (prefix: string) =>
+    Object.fromEntries(Object.entries(proposal).filter(([k]) => k.startsWith(prefix)));
+  const values: Record<string, Record<string, unknown>> = {
+    'Select coolant': {
+      ...pick('coolantSelection_'),
+      coolantSelection_rationale: 'Glycol mix for freeze margin.',
+    },
+    'Size coolant distribution units': pick('cduSizing_'),
+    'Configure secondary loop': pick('loopConfiguration_'),
+    'Check system limits': check.checkTaskValues,
+  };
   let next = started.nextTask;
-  for (const name of [
-    'Select coolant',
-    'Size coolant distribution units',
-    'Configure secondary loop',
-    'Check system limits',
-  ]) {
-    const done = await call('iterop_complete_task', {
-      taskId: next.taskId,
-      values: calc.tasks[name],
-    });
+  for (const name of Object.keys(values)) {
+    if (name === 'Check system limits') {
+      // Claude cannot grade its own work: invented check values are refused.
+      const selfGraded = await call('iterop_complete_task', {
+        taskId: next.taskId,
+        values: { systemCheck_result: 'PASS', systemCheck_findings: 'Looks good to me.' },
+      });
+      assert.equal(selfGraded.isError, true);
+      assert.match(selfGraded.error, /only the checkTaskValues returned by cooling_check/);
+    }
+    const done = await call('iterop_complete_task', { taskId: next.taskId, values: values[name] });
     assert.equal(done.isError, undefined, JSON.stringify(done));
     next = done.nextTask;
   }
@@ -76,7 +101,7 @@ test('the direct connector exposes fixed ITEROP tools; only the two writes are d
   });
   const tools = (await client.listTools()).tools;
   assert.deepEqual(tools.map((t) => t.name).sort(), [
-    'cooling_calculate',
+    'cooling_check',
     'iterop_complete_task',
     'iterop_connection',
     'iterop_get_instance',
@@ -152,6 +177,50 @@ test('through the API Gateway: foreign tasks and processes hidden, signature ref
   assert.equal(writes.length, gw.calls.filter((c) => c.method === 'POST').length);
 });
 
+test('the independent check catches physics and redundancy errors in a proposal', async () => {
+  const { checkProposal } = await import('../server/iterop/proposal-check');
+  const envelope = {
+    itLoadKw: 1200,
+    facilityWaterC: 32,
+    rackCount: 16,
+    redundancy: 'N+1' as const,
+  };
+  const good = {
+    coolantSelection_fluid: 'water',
+    coolantSelection_cp: 4.18,
+    coolantSelection_density: 997,
+    cduSizing_model: 'CDU-500',
+    cduCapacityKw: 500,
+    cduSizing_units: 4,
+    cduSizing_dutyUnits: 3,
+    cduSizing_utilisation: 80,
+    loopConfiguration_supplyC: 35,
+    loopConfiguration_returnC: 45,
+    loopConfiguration_flowLpm: 1727,
+    loopConfiguration_rackFlowLpm: 107.9,
+  };
+  assert.equal(checkProposal(envelope, good).result, 'PASS');
+  const bad = checkProposal(envelope, {
+    ...good,
+    cduSizing_units: 3,
+    loopConfiguration_flowLpm: 800,
+    loopConfiguration_rackFlowLpm: 50,
+    loopConfiguration_supplyC: 31,
+  });
+  assert.equal(bad.result, 'FAIL');
+  const text = bad.findings.join(' ');
+  assert.match(text, /4 installed units/);
+  assert.match(text, /energy balance/);
+  assert.match(text, /cannot be below facility water/);
+  assert.equal(bad.checkTaskValues.systemCheck_result, 'FAIL');
+  const tight = checkProposal(envelope, {
+    ...good,
+    loopConfiguration_flowLpm: 1450,
+    loopConfiguration_rackFlowLpm: 90.6,
+  });
+  assert.equal(tight.result, 'REVIEW');
+});
+
 test('signature tasks are refused by the connector itself', async () => {
   const engine = new SyntheticEngine();
   const { call } = await connect({ engine, processes: definitions.map((d) => d.key) });
@@ -196,4 +265,14 @@ test('the stdio server starts on the simulated engine by default', async () => {
   } finally {
     await client.close();
   }
+});
+
+test('the review mode is the operator’s setting and is reported to Claude', async () => {
+  const base = { engine: new SyntheticEngine(), processes: definitions.map((d) => d.key) };
+  const step = await (await connect(base)).call('iterop_connection');
+  assert.equal(step.reviewMode, 'step');
+  assert.match(step.reviewRule, /wait for the expert/);
+  const final = await (await connect({ ...base, review: 'final' })).call('iterop_connection');
+  assert.equal(final.reviewMode, 'final');
+  assert.match(final.reviewRule, /validates the final result at the sign-off/);
 });
