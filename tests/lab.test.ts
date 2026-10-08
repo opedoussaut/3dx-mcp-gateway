@@ -24,9 +24,9 @@ const lab = () => {
   const engine = new SyntheticEngine();
   return { engine, o: new Orchestrator(engine) };
 };
-const approveAll = (o: Orchestrator, run: OrchestrationRun) => {
+const approveAll = async (o: Orchestrator, run: OrchestrationRun) => {
   while (run.status === 'awaiting_approval')
-    run = o.approve(run.id, run.steps.find((s) => s.status === 'awaiting_approval')!.id);
+    run = await o.approve(run.id, run.steps.find((s) => s.status === 'awaiting_approval')!.id);
   return run;
 };
 const throwsStatus = (fn: () => unknown, status: number, message?: RegExp) =>
@@ -37,7 +37,7 @@ const throwsStatus = (fn: () => unknown, status: number, message?: RegExp) =>
     return true;
   });
 
-test('synthetic engine returns FD04-shaped bodies and enforces documented errors', () => {
+test('synthetic engine returns FD04-shaped bodies and enforces documented errors', async () => {
   const { engine } = lab();
   assert.ok(startableProcessesList.safeParse(engine.getAllStartableProcesses()).success);
   assert.ok(basicProcessInfo.safeParse(engine.getBasicProcessInfo(COOLING_CHAIN)).success);
@@ -80,9 +80,9 @@ test('synthetic engine returns FD04-shaped bodies and enforces documented errors
   throwsStatus(() => engine.completeTask('missing', {}), 404);
 });
 
-test('a signature task cannot be completed through the API (FD04 403)', () => {
+test('a signature task cannot be completed through the API (FD04 403)', async () => {
   const { engine, o } = lab();
-  approveAll(o, o.start(CONFIGURE));
+  await approveAll(o, await o.start(CONFIGURE));
   const [signoff] = engine.reviewerQueue();
   assert.equal(signoff.name, 'Engineering sign-off');
   // Not in the operator's own task list, and refused by completeTask.
@@ -90,9 +90,9 @@ test('a signature task cannot be completed through the API (FD04 403)', () => {
   throwsStatus(() => engine.completeTask(signoff.id, { data: {} }), 403, /signed/);
 });
 
-test('each write stops as a prepared request; nothing reaches the engine until approved', () => {
+test('each write stops as a prepared request; nothing reaches the engine until approved', async () => {
   const { engine, o } = lab();
-  const run = o.start(CONFIGURE);
+  const run = await o.start(CONFIGURE);
   assert.equal(run.status, 'awaiting_approval');
   const pending = run.steps.find((s) => s.status === 'awaiting_approval')!;
   assert.equal(pending.operationId, 'startProcess');
@@ -119,13 +119,17 @@ test('each write stops as a prepared request; nothing reaches the engine until a
   assert.equal(cancelled.status, 'cancelled');
   assert.equal(engine.getTasksByUser().length, 0);
   assert.ok(cancelled.steps.every((s) => s.status === 'done' || s.status === 'skipped'));
-  throwsStatus(() => o.approve(run.id, pending.id), 409);
+  await assert.rejects(o.approve(run.id, pending.id), (e: unknown) => {
+    assert.ok(e instanceof EngineError);
+    assert.equal(e.status, 409);
+    return true;
+  });
 });
 
-test('the cooling chain runs end to end, then hands off to the human reviewer', () => {
+test('the cooling chain runs end to end, then hands off to the human reviewer', async () => {
   const { engine, o } = lab();
-  const first = o.start(CONFIGURE);
-  const run = o.approve(
+  const first = await o.start(CONFIGURE);
+  const run = await o.approve(
     first.id,
     first.steps.find((s) => s.status === 'awaiting_approval')!.id,
     true,
@@ -156,10 +160,10 @@ test('the cooling chain runs end to end, then hands off to the human reviewer', 
   for (const id of neverCalled) assert.ok(!used.has(id));
 });
 
-test('a reviewer rejection comes back to the inbox and NOVA reruns the chain', () => {
+test('a reviewer rejection comes back to the inbox and NOVA reruns the chain', async () => {
   const { engine, o } = lab();
-  approveAll(o, o.start(CONFIGURE));
-  const empty = o.start('Check my inbox and handle any rework', 'all');
+  await approveAll(o, await o.start(CONFIGURE));
+  const empty = await o.start('Check my inbox and handle any rework', 'all');
   assert.equal(empty.status, 'completed');
   assert.match(empty.summary, /none sent back|empty/);
   engine.signAsReviewer(
@@ -167,7 +171,7 @@ test('a reviewer rejection comes back to the inbox and NOVA reruns the chain', (
     'Reject',
     'Use plain water instead of glycol and go 2N',
   );
-  const rework = o.start('Check my inbox and handle any rework', 'all');
+  const rework = await o.start('Check my inbox and handle any rework', 'all');
   assert.equal(rework.status, 'awaiting_signoff');
   assert.equal(rework.intent, 'recalculate');
   assert.match(rework.findings[0], /coolant auto → water, redundancy N\+1 → 2N/);
@@ -176,20 +180,20 @@ test('a reviewer rejection comes back to the inbox and NOVA reruns the chain', (
   assert.equal(engine.reviewerQueue().length, 1);
   // An unusable comment leaves the rework task open for the person.
   engine.signAsReviewer(engine.reviewerQueue()[0].id, 'Reject', 'Not convinced, discuss');
-  const unclear = o.start('Check my inbox', 'all');
+  const unclear = await o.start('Check my inbox', 'all');
   assert.equal(unclear.status, 'needs_input');
   assert.equal(engine.getTasksByUser()[0].name, 'Rework configuration');
   // Approval in the reviewer's hands completes the instance.
   const { engine: e2, o: o2 } = lab();
-  const done = approveAll(o2, o2.start(CONFIGURE));
+  const done = await approveAll(o2, await o2.start(CONFIGURE));
   e2.signAsReviewer(e2.reviewerQueue()[0].id, 'Approve');
   throwsStatus(() => e2.getInstanceInfo(done.instanceId!), 404, /completed/);
 });
 
-test('a what-if reruns from the previous inputs and reports what changed', () => {
+test('a what-if reruns from the previous inputs and reports what changed', async () => {
   const { o } = lab();
-  approveAll(o, o.start(CONFIGURE));
-  const whatIf = o.start('Facility water is now 38 °C — what needs to be recalculated?', 'all');
+  await approveAll(o, await o.start(CONFIGURE));
+  const whatIf = await o.start('Facility water is now 38 °C — what needs to be recalculated?', 'all');
   assert.equal(whatIf.intent, 'recalculate');
   assert.match(whatIf.findings.join(' '), /facility water 32 → 38\. Affected stages: loop, check/);
   const changed = Object.fromEntries(
@@ -200,7 +204,7 @@ test('a what-if reruns from the previous inputs and reports what changed', () =>
   assert.ok(!('cduSizing_units' in changed));
 });
 
-test('refusals, missing inputs and reads plan no write', () => {
+test('refusals, missing inputs and reads plan no write', async () => {
   const { engine, o } = lab();
   for (const prompt of [
     'Reassign the sign-off task to another engineer',
@@ -211,31 +215,31 @@ test('refusals, missing inputs and reads plan no write', () => {
     'Grant me rights on the process',
     'Stop the process instance',
   ]) {
-    const run = o.start(prompt);
+    const run = await o.start(prompt);
     assert.equal(run.status, 'blocked', prompt);
     assert.equal(run.steps.length, 0, prompt);
   }
-  const missing = o.start('Configure the cooling chain for 900 kW');
+  const missing = await o.start('Configure the cooling chain for 900 kW');
   assert.equal(missing.status, 'needs_input');
   assert.equal(missing.missing.length, 2);
-  const range = o.start('Configure the cooling chain for 30 kW, 30 °C facility water, 4 racks');
+  const range = await o.start('Configure the cooling chain for 30 kW, 30 °C facility water, 4 racks');
   assert.equal(range.status, 'needs_input');
-  const noSource = o.start('Register a candidate requirement: supply must stay below 40 °C');
+  const noSource = await o.start('Register a candidate requirement: supply must stay below 40 °C');
   assert.equal(noSource.status, 'needs_input');
-  const tasks = o.start('What tasks are waiting for me?');
+  const tasks = await o.start('What tasks are waiting for me?');
   assert.deepEqual(
     tasks.steps.map((s) => s.kind),
     ['read'],
   );
-  const processes = o.start('Which processes can I start?');
+  const processes = await o.start('Which processes can I start?');
   assert.equal(processes.records.length, definitions.length);
-  assert.equal(o.start('Tell me a joke').status, 'needs_input');
+  assert.equal((await o.start('Tell me a joke')).status, 'needs_input');
   assert.equal(engine.getTasksByUser().length, 0);
 });
 
-test('a candidate requirement starts the intake and waits for the reviewer', () => {
+test('a candidate requirement starts the intake and waits for the reviewer', async () => {
   const { engine, o } = lab();
-  const run = o.start(
+  const run = await o.start(
     'Register a candidate requirement: secondary supply must stay at or below 40 °C, source: public guideline section 4',
     'all',
   );
@@ -251,12 +255,12 @@ test('a candidate requirement starts the intake and waits for the reviewer', () 
   assert.equal(engine.reviewerQueue()[0].name, 'Review candidate requirement');
 });
 
-test('a process model that does not match the lab definition stops before any write', () => {
+test('a process model that does not match the lab definition stops before any write', async () => {
   const engine = new SyntheticEngine();
   const original = engine.getTaskInstanceInformations.bind(engine);
   engine.getTaskInstanceInformations = (id: string) => ({ ...original(id), expectedFields: [] });
   const o = new Orchestrator(engine);
-  const run = o.start(CONFIGURE, 'all');
+  const run = await o.start(CONFIGURE, 'all');
   assert.equal(run.status, 'failed');
   assert.match(run.summary, /does not declare coolantSelection_fluid/);
   assert.equal(
@@ -265,7 +269,7 @@ test('a process model that does not match the lab definition stops before any wr
   );
 });
 
-test('parseInputs reads units and ignores the rejected alternative', () => {
+test('parseInputs reads units and ignores the rejected alternative', async () => {
   assert.deepEqual(parseInputs('1.2 MW, 32 °C facility water, 16 racks, 2N, PG25'), {
     itLoadKw: 1200,
     facilityWaterC: 32,
@@ -279,7 +283,7 @@ test('parseInputs reads units and ignores the rejected alternative', () => {
   assert.equal(parseInputs('800,5 kW').itLoadKw, 801);
 });
 
-test('the importable BPMN models match the lab process definitions', () => {
+test('the importable BPMN models match the lab process definitions', async () => {
   for (const def of definitions) {
     const file = `docs/iterop/lab/${def.key === COOLING_CHAIN ? 'nova-lab-cooling-chain' : 'nova-lab-requirement-intake'}.bpmn`;
     const xml = readFileSync(file, 'utf8');
@@ -305,7 +309,7 @@ const SPEC_FILE = '.private/businessprocess_v2.openapi.json';
 test(
   'lab operations and engine bodies match the official FD04 specification',
   { skip: !existsSync(SPEC_FILE) && 'private R2026x-FD04 OpenAPI not present (never committed)' },
-  () => {
+  async () => {
     const { spec, operation } = loadSpec(readFileSync(SPEC_FILE, 'utf8'));
     for (const op of Object.values(labOperations)) {
       const found = operation(op.operationId);
@@ -322,7 +326,7 @@ test(
     const ajv = new Ajv2020({ strict: false, validateFormats: false });
     const schemas = (spec.components as { schemas: Record<string, object> }).schemas;
     const { engine, o } = lab();
-    const run = approveAll(o, o.start(CONFIGURE));
+    const run = await approveAll(o, await o.start(CONFIGURE));
     const check = (operationId: string, body: unknown) => {
       const schema = operation(operationId)!.okSchema;
       assert.ok(schema, operationId);

@@ -16,15 +16,16 @@ export class EngineError extends Error {
  * What the orchestrator needs from a process engine. Every method mirrors one FD04 operation and
  * returns its documented response body (or `{ status }` where FD04 documents no body).
  */
+type Awaitable<T> = T | Promise<T>;
 export interface ProcessEngine {
   readonly source: Source;
-  getAllStartableProcesses(): unknown;
-  getBasicProcessInfo(processKey: string): unknown;
-  getTasksByUser(): unknown;
-  getTaskInstanceInformations(taskId: string): unknown;
-  getInstanceInfo(instanceId: string): unknown;
-  startProcess(processKey: string, body: unknown): { status: 201 };
-  completeTask(taskId: string, body: unknown): { status: 200 };
+  getAllStartableProcesses(): Awaitable<unknown>;
+  getBasicProcessInfo(processKey: string): Awaitable<unknown>;
+  getTasksByUser(): Awaitable<unknown>;
+  getTaskInstanceInformations(taskId: string): Awaitable<unknown>;
+  getInstanceInfo(instanceId: string): Awaitable<unknown>;
+  startProcess(processKey: string, body: unknown): Awaitable<{ status: 201 }>;
+  completeTask(taskId: string, body: unknown): Awaitable<{ status: 200 }>;
 }
 
 type Instance = {

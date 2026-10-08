@@ -151,9 +151,9 @@ if (source === 'synthetic') {
       records: run.records,
     });
   };
-  const guard = async (fn: () => OrchestrationRun) => {
+  const guard = async (fn: () => OrchestrationRun | Promise<OrchestrationRun>) => {
     try {
-      return view(fn());
+      return view(await fn());
     } catch (error) {
       return {
         ...localResult({ error: error instanceof EngineError ? error.message : 'REQUEST_FAILED' }),

@@ -852,3 +852,17 @@
     transition: none;
   }
 }
+
+.lab-live-note {
+  margin: -6px 0 0;
+}
+.lab-probe .lab-summary {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.lab-segment button:disabled {
+  color: #8796a5;
+  cursor: not-allowed;
+}

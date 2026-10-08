@@ -31,7 +31,8 @@ type Queue = {
   decisions: string[];
 }[];
 type LabState = {
-  source: 'synthetic';
+  source: 'synthetic' | 'live';
+  live: { ready: boolean; blockers: string[]; drive: string[] };
   specRelease: string;
   operations: {
     operationId: string;
@@ -45,6 +46,11 @@ type LabState = {
   reviewerQueue: Queue;
 };
 type Reply = { run?: OrchestrationRun; state: LabState };
+type Probe = {
+  checkedAt: string;
+  outcome: 'PASS' | 'PARTIAL' | 'DENIED' | 'FAIL';
+  checks: { name: string; ok: boolean; detail: string }[];
+};
 
 const examples = [
   'Configure the cooling chain for 1.2 MW IT load, 32 °C facility water, 16 racks, N+1',
@@ -96,15 +102,30 @@ export function OrchestratorView() {
   const [approval, setApproval] = useState<'each' | 'all'>('each');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [source, setSource] = useState<'synthetic' | 'live'>('synthetic');
+  const [probe, setProbe] = useState<Probe | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
-    api<LabState>('/lab')
+    api<LabState>(`/lab?source=${source}`)
       .then((s) => {
         setState(s);
         setActiveId(s.runs[0]?.id ?? null);
       })
       .catch(() => setError('The NOVA runtime is unavailable.'));
-  }, []);
+  }, [source]);
+  const live = source === 'live';
+  const liveReady = Boolean(state?.live.ready);
+  const testConnection = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      setProbe(await api<Probe>('/lab/probe', {}));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'The connection test failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
   const active = useMemo(
     () => state?.runs.find((r) => r.id === activeId) ?? null,
     [state, activeId],
@@ -125,7 +146,7 @@ export function OrchestratorView() {
   };
   const run = async (text = prompt) => {
     if (busy || text.trim().length < 3) return;
-    const reply = await call('/lab/runs', { prompt: text.trim(), approval });
+    const reply = await call('/lab/runs', { prompt: text.trim(), approval, source });
     if (reply) setPrompt('');
   };
   const pending = active?.steps.find((s) => s.status === 'awaiting_approval');
@@ -145,12 +166,74 @@ export function OrchestratorView() {
           </div>
         </div>
         <div className="lab-head-tags">
-          <SourceTag source="synthetic" />
+          <div className="lab-segment" role="radiogroup" aria-label="Process engine">
+            <button
+              role="radio"
+              aria-checked={!live}
+              className={!live ? 'on' : ''}
+              onClick={() => setSource('synthetic')}
+            >
+              Simulated
+            </button>
+            <button
+              role="radio"
+              aria-checked={live}
+              className={live ? 'on' : ''}
+              disabled={!liveReady && !live}
+              title={liveReady ? undefined : 'Configure the sandbox connection first'}
+              onClick={() => setSource('live')}
+            >
+              Sandbox (live)
+            </button>
+          </div>
+          <SourceTag source={source} />
           <span className="lab-engine">
-            <ShieldCheck size={14} /> Simulated process engine · no platform request
+            <ShieldCheck size={14} />{' '}
+            {live
+              ? 'Sandbox tenant through the API Gateway · every write needs your approval'
+              : 'Simulated process engine · no platform request'}
           </span>
         </div>
       </header>
+      {!liveReady && state && (
+        <p className="lab-fine lab-live-note">
+          Sandbox (live) is off: {state.live.blockers[0]} See docs/iterop/LAB-ORCHESTRATION.md.
+        </p>
+      )}
+      {live && (
+        <section className="lab-card lab-probe" aria-label="Connection test">
+          <div className="lab-canvas-head">
+            <h2 className="g7-label">Sandbox connection</h2>
+            <button className="button secondary" disabled={busy} onClick={testConnection}>
+              Test connection (read-only)
+            </button>
+          </div>
+          {probe ? (
+            <>
+              <p className="lab-summary">
+                <span
+                  className={`lab-status ${probe.outcome === 'PASS' ? 'green' : probe.outcome === 'PARTIAL' ? 'amber' : 'red'}`}
+                >
+                  {probe.outcome}
+                </span>{' '}
+                Checked the lab models without writing anything.
+              </p>
+              <ul className="lab-findings">
+                {probe.checks.map((c) => (
+                  <li key={c.name}>
+                    {c.ok ? '✔' : '✖'} {c.name} — {c.detail}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <p className="g7-muted">
+              Checks that the agent can see the lab processes and that each imported model declares
+              the tasks and fields NOVA will write. No write is made.
+            </p>
+          )}
+        </section>
+      )}
 
       <section className="lab-composer" aria-label="New command">
         <label htmlFor="lab-prompt" className="g7-label">
@@ -241,7 +324,7 @@ export function OrchestratorView() {
               cancel={() => call(`/lab/runs/${active.id}/cancel`, {})}
             />
           )}
-          {state && (
+          {state && !live && (
             <Reviewer
               queue={state.reviewerQueue}
               busy={busy}
@@ -499,8 +582,9 @@ function RunCard({
             </button>
           </div>
           <p className="lab-fine">
-            Sent to the synthetic engine only. Approval here is not an authorization for a live
-            platform.
+            {run.source === 'live'
+              ? 'Approving sends this request to the sandbox tenant through the API Gateway.'
+              : 'Sent to the synthetic engine only. Approval here is not an authorization for a live platform.'}
           </p>
         </div>
       )}

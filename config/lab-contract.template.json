@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "purpose": "NOVA_ORCHESTRATION_LAB",
+  "tenantClass": "SANDBOX",
+  "dataPolicy": "SYNTHETIC_ONLY",
+  "specRelease": "R2026x-FD04",
+  "specSha256": "90212fe7b2a1740e39952178faa06422d177c71ff65e7ddb3ce908d294f6326e",
+  "apiVersion": "2.0.0",
+  "gatewayBasePath": "/api/businessprocess/v2",
+  "processKeys": {
+    "syn-cooling-chain": "",
+    "syn-requirement-intake": ""
+  },
+  "driveApproval": {
+    "approvedBy": "",
+    "approvedOn": "",
+    "operations": ["startProcess", "completeTask"]
+  },
+  "reviewedBy": "",
+  "verifiedAt": ""
+}

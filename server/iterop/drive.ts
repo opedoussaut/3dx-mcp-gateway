@@ -34,6 +34,14 @@ export const labOperations = {
     documentedStatus: [200, 404, 500],
     note: 'Basic, non-sensitive process information.',
   },
+  getProcessInfo: {
+    operationId: 'getProcessInfo',
+    method: 'GET',
+    path: '/repository/processes/{processKey}',
+    kind: 'read',
+    documentedStatus: [200, 400, 403, 404, 500],
+    note: 'Human tasks and their expected outputs; used to check a live model before any write.',
+  },
   getTasksByUser: {
     operationId: 'getTasksByUser',
     method: 'GET',
@@ -156,6 +164,22 @@ export const taskInstanceResponse = z.looseObject({
   startDate: int.optional(),
   providedData: z.array(variableValue).optional(),
   expectedFields: z.array(variableDefinition).optional(),
+});
+/** components.schemas.GetProcessInfoResponse (the properties the lab uses) */
+export const processInfoResponse = z.looseObject({
+  key: z.string().optional(),
+  name: z.string().optional(),
+  version: int.optional(),
+  humanTasks: z
+    .array(
+      z.looseObject({
+        id: z.string().optional(),
+        name: z.string().optional(),
+        outputs: z.array(z.looseObject({ id: z.string().optional() })).optional(),
+      }),
+    )
+    .optional(),
+  variables: z.record(z.string(), variableDefinition).optional(),
 });
 /** components.schemas.GetInstanceInfoResponse */
 export const instanceInfoResponse = z.looseObject({

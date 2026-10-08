@@ -102,15 +102,90 @@ Assign the automated tasks and the rework task to the operator identity NOVA wil
 
 ## Going live on a sandbox tenant
 
-The owner has a sandbox tenant with full rights, where the data can be deleted at any time. That is the right place for the first live drive test. The tenant URL stays out of this public repository; it goes in a private `.env` as `NOVA_ITEROP_ORIGIN`.
+The live engine (`server/iterop/lab-live.ts`) uses the route FD04 documents for the cloud: `{APIGateway}/api/businessprocess/v2`. It authenticates with an **API Gateway application key** plus an **Openness Agent** (HTTP Basic on the first call), then the gateway's session cookies. It is admitted only by a private **sandbox contract**, and it calls only the lab operations.
 
-There is **no live transport for drive operations yet**, by design. To add one:
+Operation by operation:
 
-1. **Data rule.** Only the synthetic lab processes and invented values go on the sandbox, never customer or partner data.
-2. **Model.** Import both BPMN files and configure the forms and assignments as above.
-3. **Route and credential.** Establish which REST route the sandbox offers: administrator-issued Business Process API credentials (HTTP Basic, as FD04 declares) or the platform API gateway. Then create a credential for the operator identity. Store it only in the private `.env` on the machine that runs NOVA. Never paste it in chat or commit it.
-4. **Drive contract.** Add a reviewed private contract that admits `startProcess` and `completeTask` for the two lab process keys only and declares the tenant a sandbox. Then add a live engine behind the same `ProcessEngine` interface, with the same approval gates, bounded transport and FD04 validation.
-5. **First live test.** Start one cooling-chain instance and compare each step with the process application. Prove three things:
-   - whether a human credential may call `startProcess` (because of the documented robot-only 400);
-   - the `startDate` unit;
-   - the identificator correlation.
+- **Reads:** the five lab reads, plus `getProcessInfo` for the connection test.
+- **Writes:** `startProcess` and `completeTask`, only for the process keys named in the contract, and only after the operator approves each one in NOVA.
+- **Before each write:** NOVA checks that start variables belong to the lab process, and re-reads a task to confirm it belongs to a lab process.
+- **Never:** `user` or `login` are never sent.
+- **Failures:**
+  - A redirect counts as a rejected session.
+  - A 401 re-authenticates once, then stops.
+  - Every response is checked against FD04 and capped at 1 MB.
+
+The tenant URL, key, agent and contract stay in `.env` and `.private/`. None of them is ever committed.
+
+### 1. Data rule
+
+The sandbox holds only the two lab processes and invented values. Never put customer or partner data there.
+
+### 2. API Gateway application (API Gateway app → _My applications_ → +)
+
+- **Name:** `NOVA orchestration lab`
+- **Description:** _NOVA lab: AI-assisted orchestration of two synthetic test processes through the Business Process API. Reads, plus start/complete only after human approval. No admin calls. Synthetic data only._
+- **API key expiry:** short, about 3 months.
+- **Unrestricted mode: OFF.** Select **Business Process API**. Use _partial_ scope with these 8 endpoints, or _full_ scope on a sandbox:
+  - `GET /repository/processes/startable/list`
+  - `GET /repository/processes/{processKey}/basic`
+  - `GET /repository/processes/{processKey}`
+  - `GET /runtime/tasks`
+  - `GET /runtime/tasks/{taskId}`
+  - `GET /runtime/instances/{instanceId}`
+  - `POST /runtime/processes/{processKey}`
+  - `POST /runtime/tasks/{taskId}`
+- **Copy the API key value at once.** It is shown only once.
+- **API Collection → Business Process card:** check that it is _RELEASED_ and v2. Its `server` URL should end in `/api/businessprocess/v2`. Its origin is `NOVA_LAB_GATEWAY_ORIGIN`.
+
+### 3. Openness Agent (Agent Management app)
+
+Create an agent that acts as a **non-admin member user**, preferably a dedicated "NOVA" member:
+
+- This user must be allowed to start the lab processes.
+- This user must be the assignee of the automated tasks and the rework task.
+- Assign the sign-off tasks to a different person.
+- Copy the agent ID and secret. They are also shown only once.
+
+### 4. Local configuration (on the machine that runs NOVA)
+
+```bash
+cp .env.example .env          # then fill the NOVA_LAB_* lines
+mkdir -p .private && cp config/lab-contract.template.json .private/lab-contract.json
+```
+
+In `.private/lab-contract.json`, fill in:
+
+- `processKeys`: the keys the tenant gave the imported models. They are shown in the designer or in the startable list.
+- `driveApproval.approvedBy` and `driveApproval.approvedOn`.
+- `reviewedBy` and `verifiedAt`.
+
+The template is rejected until these are set.
+
+### 5. First live test: read-only
+
+```bash
+npm run lab:probe
+```
+
+Or use **Orchestration → Sandbox (live) → Test connection (read-only)**. The test checks four things, with no write:
+
+- the agent can see the lab processes;
+- every task NOVA needs is modelled;
+- each task declares the output fields NOVA will write;
+- the start form has the start variables.
+
+| Result    | Meaning                                                           |
+| --------- | ----------------------------------------------------------------- |
+| `PASS`    | All checks hold.                                                  |
+| `PARTIAL` | Some checks fail. Fix the listed tasks or fields in the designer. |
+| `DENIED`  | Key, agent or rights.                                             |
+| `FAIL`    | Network or response.                                              |
+
+### 6. First live drive
+
+In **Sandbox (live)**, run the cooling-chain command with **Approve each write**, and compare each step with the process application. This run settles three open questions:
+
+- **Who may start a process.** FD04 documents `startProcess` as "Only robot can use this API". If the start returns 400, the agent's user must be a robot, or the route must change.
+- **The `startDate` unit.**
+- **The run reference.** Check that the `identificator` sent by `startProcess` fills the instance identificator.

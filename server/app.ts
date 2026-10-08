@@ -10,6 +10,13 @@ import { Orchestrator } from './iterop/orchestrator';
 import { EngineError, SyntheticEngine } from './iterop/simulator';
 import { labOperations, neverCalled } from './iterop/drive';
 import { SPEC } from './iterop/operations';
+import {
+  createLiveEngine,
+  labLiveStatus,
+  loadLabLiveConfig,
+  probeLive,
+  type LabLiveConfig,
+} from './iterop/lab-live';
 import type { Comparison, Mission } from '../shared/types';
 import { benchmarks } from '../shared/benchmarks';
 import corpus from '../docs/blueprint/benchmarks/fixtures/synthetic-engineering-corpus.json';
@@ -57,7 +64,7 @@ const labReviewInput = z
     comment: z.string().max(1000).default(''),
   })
   .strict();
-type Lab = { engine: SyntheticEngine; orchestrator: Orchestrator };
+type Lab = { engine: SyntheticEngine; orchestrator: Orchestrator; live?: Orchestrator };
 type Session = {
   lab?: Lab;
   missions: Mission[];
@@ -71,6 +78,8 @@ export function createApp(
   config: Config = loadConfig(),
   gateway = new Gateway(config),
   iterop = new IteropConnector(loadIteropConfig()),
+  labLive: LabLiveConfig = loadLabLiveConfig(),
+  labFetch: typeof fetch = fetch,
 ) {
   const app = express();
   const sessions = new Map<string, Session>();
@@ -144,21 +153,28 @@ export function createApp(
     const { notice, placements, ...flows } = iteropFixture.flows;
     res.json({ source: 'synthetic', illustration: true, notice, flows, placements });
   });
-  // ── Process orchestration lab: SYNTHETIC engine only. No live drive transport exists. ──
+  // ── Process orchestration lab. Synthetic engine by default; the live engine exists only when a
+  // reviewed sandbox contract, gateway origin, API key and Openness Agent are configured. ──
+  const liveEngine = createLiveEngine(labLive, labFetch);
   const lab = (session: Session) => {
     if (!session.lab) {
       const engine = new SyntheticEngine();
-      session.lab = { engine, orchestrator: new Orchestrator(engine) };
+      session.lab = {
+        engine,
+        orchestrator: new Orchestrator(engine),
+        live: liveEngine && new Orchestrator(liveEngine),
+      };
     }
     return session.lab;
   };
-  const labState = (l: Lab) => ({
-    source: 'synthetic' as const,
+  const labState = (l: Lab, source: 'synthetic' | 'live' = 'synthetic') => ({
+    source,
     specRelease: SPEC.release,
     operations: Object.values(labOperations),
     neverCalled,
-    runs: l.orchestrator.runs,
-    reviewerQueue: l.engine.reviewerQueue(),
+    runs: source === 'live' ? (l.live?.runs ?? []) : l.orchestrator.runs,
+    reviewerQueue: source === 'live' ? [] : l.engine.reviewerQueue(),
+    live: labLiveStatus(labLive),
   });
   const labError = (res: express.Response, e: unknown) => {
     if (e instanceof EngineError)
@@ -167,43 +183,65 @@ export function createApp(
         .json({ error: e.message });
     throw e;
   };
-  app.get('/api/lab', (_req, res) => res.json(labState(lab(res.locals.session as Session))));
-  app.post('/api/lab/runs', (req, res) => {
+  const owner = (l: Lab, runId: string) =>
+    l.live?.runs.some((r) => r.id === runId)
+      ? { orchestrator: l.live, source: 'live' as const }
+      : { orchestrator: l.orchestrator, source: 'synthetic' as const };
+  app.get('/api/lab', (req, res) =>
+    res.json(
+      labState(
+        lab(res.locals.session as Session),
+        req.query.source === 'live' ? 'live' : 'synthetic',
+      ),
+    ),
+  );
+  app.post('/api/lab/runs', async (req, res) => {
     const parsed = labRunInput.safeParse(req.body);
     if (!parsed.success)
       return res.status(400).json({ error: 'Write a command of 3–1,000 characters.' });
-    if (parsed.data.source === 'live')
-      return res.status(409).json({
-        error:
-          'Live process control is not authorized: there is no reviewed drive contract, credential or approval path. No request was made.',
-      });
     const l = lab(res.locals.session as Session);
+    const source = parsed.data.source;
+    if (source === 'live' && !l.live)
+      return res.status(409).json({
+        error: `Live process control is not configured. No request was made. ${labLive.blockers.join(' ')}`,
+      });
     try {
-      const run = l.orchestrator.start(parsed.data.prompt, parsed.data.approval);
-      res.json({ run, state: labState(l) });
+      const orchestrator = source === 'live' ? l.live! : l.orchestrator;
+      const run = await orchestrator.start(parsed.data.prompt, parsed.data.approval);
+      res.json({ run, state: labState(l, source) });
     } catch (e) {
       labError(res, e);
     }
   });
-  app.post('/api/lab/runs/:id/approve', (req, res) => {
+  app.post('/api/lab/runs/:id/approve', async (req, res) => {
     const parsed = labApproveInput.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Name the step to approve.' });
     const l = lab(res.locals.session as Session);
+    const { orchestrator, source } = owner(l, req.params.id);
     try {
-      const run = l.orchestrator.approve(req.params.id, parsed.data.stepId, parsed.data.all);
-      res.json({ run, state: labState(l) });
+      const run = await orchestrator.approve(req.params.id, parsed.data.stepId, parsed.data.all);
+      res.json({ run, state: labState(l, source) });
     } catch (e) {
       labError(res, e);
     }
   });
   app.post('/api/lab/runs/:id/cancel', (req, res) => {
     const l = lab(res.locals.session as Session);
+    const { orchestrator, source } = owner(l, req.params.id);
     try {
-      const run = l.orchestrator.cancel(req.params.id);
-      res.json({ run, state: labState(l) });
+      const run = orchestrator.cancel(req.params.id);
+      res.json({ run, state: labState(l, source) });
     } catch (e) {
       labError(res, e);
     }
+  });
+  // Read-only live check of the sandbox models. Makes no write.
+  app.post('/api/lab/probe', async (_req, res) => {
+    if (!liveEngine)
+      return res.status(409).json({
+        error: `Live process control is not configured. No request was made. ${labLive.blockers.join(' ')}`,
+      });
+    res.json(await probeLive(liveEngine));
   });
   // SIMULATED reviewer action in the process application. Not an API NOVA can call on a platform.
   app.post('/api/lab/review', (req, res) => {

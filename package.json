@@ -11,7 +11,8 @@
     "test": "node --import tsx --test tests/*.test.ts",
     "test:e2e": "playwright test",
     "check": "npm run typecheck && npm test && npm run build",
-    "iterop:openapi": "node --import tsx scripts/iterop-openapi.ts"
+    "iterop:openapi": "node --import tsx scripts/iterop-openapi.ts",
+    "lab:probe": "node --import tsx scripts/lab-probe.ts"
   },
   "repository": {
     "type": "git",

@@ -33,7 +33,7 @@ type Planned = {
   step: OrchestrationStep;
   /** Drive steps: build the exact request shown for approval. */
   prepare?: (c: Ctx) => { path: string; body: unknown };
-  exec: (c: Ctx, step: OrchestrationStep) => void;
+  exec: (c: Ctx, step: OrchestrationStep) => void | Promise<void>;
 };
 type Task = {
   id: string;
@@ -121,11 +121,12 @@ const chainStages = (def: ProcessDefinition): OrchestrationStage[] => [
 export class Orchestrator {
   runs: OrchestrationRun[] = [];
   private plans = new Map<string, Planned[]>();
+  private running = new Set<string>();
   private ctx = new Map<string, Ctx>();
   private count = 0;
   constructor(public engine: ProcessEngine) {}
 
-  start(prompt: string, approval: 'each' | 'all' = 'each'): OrchestrationRun {
+  async start(prompt: string, approval: 'each' | 'all' = 'each'): Promise<OrchestrationRun> {
     const run: OrchestrationRun = {
       id: randomUUID(),
       number: ++this.count,
@@ -156,24 +157,31 @@ export class Orchestrator {
     const plan = this.plan(run, ctx);
     this.plans.set(run.id, plan);
     run.steps = plan.map((p) => p.step);
-    if (run.status !== 'needs_input' && run.status !== 'blocked') this.advance(run);
+    if (run.status !== 'needs_input' && run.status !== 'blocked')
+      await this.locked(run, () => this.advance(run));
     return run;
   }
 
-  approve(runId: string, stepId: string, all = false): OrchestrationRun {
+  async approve(runId: string, stepId: string, all = false): Promise<OrchestrationRun> {
     const run = this.find(runId);
     const plan = this.plans.get(runId)!;
     const p = plan.find((x) => x.step.id === stepId);
     if (!p || p.step.status !== 'awaiting_approval' || run.status !== 'awaiting_approval')
       throw new EngineError(409, 'This step is not waiting for approval.');
+    if (this.running.has(runId))
+      throw new EngineError(409, 'This run is already executing a step.');
     if (all) run.approval = 'all';
-    this.execute(run, p);
-    if (stepStatus(p) === 'done') this.advance(run);
+    await this.locked(run, async () => {
+      await this.execute(run, p);
+      if (stepStatus(p) === 'done') await this.advance(run);
+    });
     return run;
   }
 
   cancel(runId: string): OrchestrationRun {
     const run = this.find(runId);
+    if (this.running.has(runId))
+      throw new EngineError(409, 'This run is already executing a step.');
     if (run.status !== 'awaiting_approval')
       throw new EngineError(409, 'Only a run waiting for approval can be cancelled.');
     for (const s of run.steps)
@@ -318,8 +326,8 @@ export class Orchestrator {
     const def = definition(COOLING_CHAIN)!;
     const rework = def.rework!;
     const steps: Planned[] = [
-      read('getTasksByUser', 'Check my inbox', {}, (c, step) => {
-        const tasks = this.engine.getTasksByUser() as Task[];
+      read('getTasksByUser', 'Check my inbox', {}, async (c, step) => {
+        const tasks = (await this.engine.getTasksByUser()) as Task[];
         step.response = tasks;
         step.outcome = `200 · ${tasks.length} task${tasks.length === 1 ? '' : 's'}`;
         run.records = tasks.map((t) => ({
@@ -344,8 +352,8 @@ export class Orchestrator {
         'getTaskInstanceInformations',
         'Read the reviewer’s comment',
         { stage: 'engineeringSignoff' },
-        (c, step) => {
-          const info = this.engine.getTaskInstanceInformations(c.taskId!) as {
+        async (c, step) => {
+          const info = (await this.engine.getTaskInstanceInformations(c.taskId!)) as {
             providedData?: Variable[];
             expectedFields?: { id: string }[];
           };
@@ -471,8 +479,8 @@ export class Orchestrator {
   private planTasks(run: OrchestrationRun): Planned[] {
     run.intent = 'tasks';
     return [
-      read('getTasksByUser', 'List my open tasks', {}, (_c, step) => {
-        const tasks = this.engine.getTasksByUser() as Task[];
+      read('getTasksByUser', 'List my open tasks', {}, async (_c, step) => {
+        const tasks = (await this.engine.getTasksByUser()) as Task[];
         step.response = tasks;
         step.outcome = `200 · ${tasks.length}`;
         run.records = tasks.map((t) => ({
@@ -499,9 +507,11 @@ export class Orchestrator {
     run.identificator = last.identificator;
     run.instanceId = last.instanceId;
     return [
-      read('getInstanceInfo', `Read instance ${last.identificator}`, {}, (c, step) => {
+      read('getInstanceInfo', `Read instance ${last.identificator}`, {}, async (c, step) => {
         try {
-          const info = this.engine.getInstanceInfo(c.instanceId!) as { variables?: Variable[] };
+          const info = (await this.engine.getInstanceInfo(c.instanceId!)) as {
+            variables?: Variable[];
+          };
           step.response = info;
           step.outcome = '200';
           run.records = (info.variables ?? []).map((v) => ({
@@ -525,8 +535,8 @@ export class Orchestrator {
   private planProcesses(run: OrchestrationRun): Planned[] {
     run.intent = 'processes';
     return [
-      read('getAllStartableProcesses', 'List processes I can start', {}, (_c, step) => {
-        const list = this.engine.getAllStartableProcesses() as {
+      read('getAllStartableProcesses', 'List processes I can start', {}, async (_c, step) => {
+        const list = (await this.engine.getAllStartableProcesses()) as {
           responses?: { key: string; name: string; version: number }[];
         };
         step.response = list;
@@ -550,8 +560,10 @@ export class Orchestrator {
         'getAllStartableProcesses',
         'Confirm the process is startable',
         { stage: 'start' },
-        (_c, step) => {
-          const list = this.engine.getAllStartableProcesses() as { responses?: { key: string }[] };
+        async (_c, step) => {
+          const list = (await this.engine.getAllStartableProcesses()) as {
+            responses?: { key: string }[];
+          };
           step.response = list;
           step.outcome = `200 · ${list.responses?.length ?? 0}`;
           if (!list.responses?.some((p) => p.key === def.key))
@@ -562,8 +574,8 @@ export class Orchestrator {
         'getBasicProcessInfo',
         'Read the process definition',
         { stage: 'start', path: { processKey: def.key } },
-        (_c, step) => {
-          step.response = this.engine.getBasicProcessInfo(def.key);
+        async (_c, step) => {
+          step.response = await this.engine.getBasicProcessInfo(def.key);
           step.outcome = '200';
         },
       ),
@@ -593,25 +605,25 @@ export class Orchestrator {
     );
   }
 
-  private started(run: OrchestrationRun, c: Ctx, step: OrchestrationStep) {
+  private async started(run: OrchestrationRun, c: Ctx, step: OrchestrationStep) {
     const { path, body } = step.request as { path: string; body: unknown };
     const key = path.split('/').pop()!;
-    this.engine.startProcess(decodeURIComponent(key), body);
+    await this.engine.startProcess(decodeURIComponent(key), body);
     step.outcome = '201 · no body (FD04)';
     run.stageState.start = 'done';
     void c;
   }
 
-  private complete(c: Ctx, step: OrchestrationStep) {
+  private async complete(c: Ctx, step: OrchestrationStep) {
     const { body } = step.request as { body: unknown };
-    this.engine.completeTask(c.taskId!, body);
+    await this.engine.completeTask(c.taskId!, body);
     step.outcome = '200 · task completed';
   }
 
   /** Find the open task of this instance with the given name (identificator correlates a fresh start). */
   private locate(task: TaskDefinition, title: string): Planned {
-    return read('getTasksByUser', title, { stage: task.id }, (c, step) => {
-      const tasks = this.engine.getTasksByUser() as Task[];
+    return read('getTasksByUser', title, { stage: task.id }, async (c, step) => {
+      const tasks = (await this.engine.getTasksByUser()) as Task[];
       step.response = tasks.filter((t) => t.process?.identificator === c.identificator);
       const found = tasks.find(
         (t) =>
@@ -637,8 +649,8 @@ export class Orchestrator {
         'getTaskInstanceInformations',
         `Read the “${task.name}” form`,
         { stage: task.id },
-        (c, step) => {
-          const info = this.engine.getTaskInstanceInformations(c.taskId!) as {
+        async (c, step) => {
+          const info = (await this.engine.getTaskInstanceInformations(c.taskId!)) as {
             expectedFields?: { id: string }[];
           };
           step.response = { expectedFields: info.expectedFields };
@@ -655,7 +667,7 @@ export class Orchestrator {
           stage: task.id,
           status: 'pending',
         },
-        exec: (c, step) => {
+        exec: async (c, step) => {
           const fields = runTool(task.tool!, c);
           Object.assign(c.outputs, fields);
           step.request = { tool: task.tool, inputs: c.inputs };
@@ -676,8 +688,8 @@ export class Orchestrator {
             data: Object.fromEntries(task.expectedFields.map((f) => [f.id, c.outputs[f.id]])),
           },
         }),
-        (c, step) => {
-          this.complete(c, step);
+        async (c, step) => {
+          await this.complete(c, step);
           this.runFor(c).stageState[task.id] = 'done';
         },
       ),
@@ -696,7 +708,7 @@ export class Orchestrator {
           title: `Compare with ${previous.identificator}`,
           status: 'pending',
         },
-        exec: (c, step) => {
+        exec: async (c, step) => {
           const run = this.runFor(c);
           const before = Object.fromEntries(previous.outputs.map((o) => [o.field, o.value]));
           run.changes = run.outputs.map((o) => ({
@@ -722,7 +734,7 @@ export class Orchestrator {
         method: 'POST',
         path: labOperations.completeTask.path,
       },
-      exec: (c, step) => {
+      exec: async (c, step) => {
         const run = this.runFor(c);
         step.outcome =
           'Handed to the reviewer · signature only in the process application (FD04 403)';
@@ -747,7 +759,17 @@ export class Orchestrator {
     return this.runs.find((r) => this.ctx.get(r.id) === c)!;
   }
 
-  private advance(run: OrchestrationRun) {
+  /** One step at a time per run: a second approval cannot race the first. */
+  private async locked(run: OrchestrationRun, fn: () => Promise<void>) {
+    this.running.add(run.id);
+    try {
+      await fn();
+    } finally {
+      this.running.delete(run.id);
+    }
+  }
+
+  private async advance(run: OrchestrationRun) {
     const plan = this.plans.get(run.id)!;
     const ctx = this.ctx.get(run.id)!;
     for (const p of plan) {
@@ -764,17 +786,17 @@ export class Orchestrator {
           return;
         }
       }
-      this.execute(run, p);
+      await this.execute(run, p);
       if (stepStatus(p) !== 'done') return;
     }
     if (run.status === 'awaiting_approval') run.status = 'completed';
   }
 
-  private execute(run: OrchestrationRun, p: Planned) {
+  private async execute(run: OrchestrationRun, p: Planned) {
     const ctx = this.ctx.get(run.id)!;
     p.step.at = new Date().toISOString();
     try {
-      p.exec(ctx, p.step);
+      await p.exec(ctx, p.step);
       p.step.status = 'done';
       if (run.status === 'awaiting_approval') run.status = 'completed';
     } catch (e) {
@@ -789,7 +811,7 @@ export class Orchestrator {
       const status = e instanceof EngineError ? e.status : 500;
       p.step.outcome = `${status} · ${e instanceof Error ? e.message : 'Failed'}`;
       if (p.step.stage) run.stageState[p.step.stage] = 'failed';
-      run.status = status === 403 ? 'blocked' : 'failed';
+      run.status = status === 401 || status === 403 ? 'blocked' : 'failed';
       run.summary = `${p.step.operationId ?? p.step.title} returned ${status}: ${e instanceof Error ? e.message : 'failure'} Later steps were not sent.`;
       for (const s of run.steps) if (s.status === 'pending') s.status = 'skipped';
     }
