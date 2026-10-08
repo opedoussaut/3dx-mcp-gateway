@@ -1,6 +1,13 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { z } from 'zod';
-import { COOLING_CHAIN, REQUIREMENT_INTAKE, definition, definitions } from './chain';
+import {
+  COOLING_CHAIN,
+  REQUIREMENT_INTAKE,
+  definition,
+  definitions,
+  sameTask,
+  taskName,
+} from './chain';
 import {
   completeTaskRequest,
   instanceInfoResponse,
@@ -336,9 +343,11 @@ export class LiveEngine implements ProcessEngine {
     // Only tasks of an admitted lab process, re-read from the platform just before the write.
     const info = await this.getTaskInstanceInformations(taskId);
     const known = new Set(
-      definitions.flatMap((d) => [...d.tasks, ...(d.rework ? [d.rework] : [])]).map((t) => t.name),
+      definitions
+        .flatMap((d) => [...d.tasks, ...(d.rework ? [d.rework] : [])])
+        .map((t) => taskName(t.name)),
     );
-    if (!info.name || !known.has(info.name))
+    if (!info.name || !known.has(taskName(info.name)))
       throw new EngineError(403, 'That task does not belong to a lab process.');
     await this.http.call('completeTask', { taskId: taskIdOf(taskId) }, parsed.data);
     return { status: 200 as const };
@@ -390,7 +399,7 @@ export async function probeLive(engine: LiveEngine): Promise<ProbeResult> {
       );
       const info = await engine.getProcessInfo(d.key);
       for (const t of [...d.tasks, ...(d.rework ? [d.rework] : [])]) {
-        const task = info.humanTasks?.find((h) => h.name === t.name);
+        const task = info.humanTasks?.find((h) => sameTask(h.name, t.name));
         const outputs = new Set((task?.outputs ?? []).map((o) => o.id));
         const missing = t.expectedFields
           .filter((f) => f.required && !outputs.has(f.id))

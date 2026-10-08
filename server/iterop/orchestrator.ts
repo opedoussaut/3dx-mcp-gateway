@@ -4,6 +4,7 @@ import {
   COOLING_CHAIN,
   REQUIREMENT_INTAKE,
   definition,
+  sameTask,
   type ProcessDefinition,
   type TaskDefinition,
 } from './chain';
@@ -335,7 +336,7 @@ export class Orchestrator {
           title: t.name,
           detail: `${t.process?.name ?? ''} · ${t.process?.identificator ?? ''}`,
         }));
-        const found = tasks.find((t) => t.name === rework.name);
+        const found = tasks.find((t) => sameTask(t.name, rework.name));
         if (!found) {
           run.summary = tasks.length
             ? `${tasks.length} task${tasks.length === 1 ? '' : 's'} in your inbox, none sent back for rework.`
@@ -627,7 +628,7 @@ export class Orchestrator {
       step.response = tasks.filter((t) => t.process?.identificator === c.identificator);
       const found = tasks.find(
         (t) =>
-          t.name === task.name &&
+          sameTask(t.name, task.name) &&
           (c.instanceId
             ? t.process?.instanceId === c.instanceId
             : t.process?.identificator === c.identificator),

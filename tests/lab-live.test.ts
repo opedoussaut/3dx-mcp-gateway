@@ -189,6 +189,26 @@ test('live engine refuses what the contract does not admit, before any request',
   assert.equal(gw.calls.length, 0);
 });
 
+test('task names prefixed with their BPMN lane still match the lab definition', async () => {
+  const { sameTask } = await import('../server/iterop/chain');
+  assert.ok(sameTask('[Operator (NOVA acts as you)] Select coolant', 'Select coolant'));
+  assert.ok(!sameTask('[Operator] Select coolant again', 'Select coolant'));
+  assert.ok(!sameTask('', ''));
+  let completed = false;
+  const engine = createLiveEngine(config(), async (_input, init) => {
+    if (init?.method === 'GET')
+      return json({
+        id: 'T9',
+        name: '[Operator (NOVA acts as you)] Select coolant',
+        expectedFields: [],
+      });
+    completed = true;
+    return new Response(null, { status: 200 });
+  })!;
+  await engine.completeTask('T9', { data: {} });
+  assert.ok(completed);
+});
+
 test('a task outside the lab processes cannot be completed', async () => {
   const fetcher: typeof fetch = async (input, init) =>
     init?.method === 'GET'
