@@ -25,7 +25,7 @@ You ──► Claude (Desktop / Code, your account) ──MCP stdio──► cla
 
 There is no tool for signing, reassigning, stopping, deleting, deploying or rights, and no generic "call any URL" tool.
 
-**Approvals:** the two write tools are marked destructive. Claude Desktop and Claude Code therefore ask you before each call, and the `iterop-orchestrator` skill tells Claude to show the values and ask first. Keep the tool permission on **Ask**. With "Always allow", Claude writes without asking, and the connector cannot detect that. That is the trade-off against the NOVA version, where a person clicks **Approve** in the NOVA page.
+**Approvals:** the two write tools are marked destructive. Claude Desktop and Claude Code therefore ask you before each call, and the `iterop-orchestrator` skill tells Claude to show the values and ask first. Keep the tool permission on **Ask**. With "Always allow", Claude writes without asking, and the connector cannot detect that. In Claude Code, the repository's `.claude/settings.json` adds an **ask** rule for both write tools, so they prompt even when the session would otherwise approve calls itself (auto mode); still prefer the default or Ask mode for live runs. That is the trade-off against the NOVA version, where a person clicks **Approve** in the NOVA page.
 
 ## Setup
 

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "ask": [
+      "mcp__iterop__iterop_start_process",
+      "mcp__iterop__iterop_complete_task"
+    ]
+  }
+}
