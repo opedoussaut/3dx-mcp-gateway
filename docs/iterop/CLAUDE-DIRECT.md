@@ -78,3 +78,11 @@ Nothing else needs to run: no `npm run dev`, no browser.
 - The configuration is Claude's engineering proposal, checked against illustrative lab limits. The "Check system limits" task accepts only the result of the independent check, never a value Claude writes itself. The engineer's sign-off in ITEROP is what makes it official.
 - Sign-off is always a person in ITEROP Play.
 - The NOVA version (web page, shared run view, approval click, VP explanation) is still on the `claude/iterop-orchestration-lab` branch.
+
+## Demo video
+
+To regenerate the demo video, run `npm run demo:run && npm run demo:record`. The video lands in `.private/demo-video/`; convert it to MP4 with `ffmpeg -i <file>.webm -c:v libx264 -pix_fmt yuv420p demo.mp4`.
+- **Real:** the connector, its tools, the simulated ITEROP engine and every tool result.
+- **Scripted:** Claude's chat lines and design values, and the engineer's decisions, which happen in ITEROP Play in real life.
+
+To show the live system, screen-record your own run in Claude Desktop against the sandbox instead.

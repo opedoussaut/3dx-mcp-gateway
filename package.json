@@ -13,7 +13,9 @@
     "check": "npm run typecheck && npm test && npm run build",
     "iterop:openapi": "node --import tsx scripts/iterop-openapi.ts",
     "lab:probe": "node --import tsx scripts/lab-probe.ts",
-    "iterop:mcp": "node --import tsx server/iterop-mcp.ts"
+    "iterop:mcp": "node --import tsx server/iterop-mcp.ts",
+    "demo:run": "node --import tsx scripts/demo/direct-run.ts .private/demo-run.json",
+    "demo:record": "node scripts/demo/record.mjs .private/demo-run.json .private/demo-video"
   },
   "repository": {
     "type": "git",
