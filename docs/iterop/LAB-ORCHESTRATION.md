@@ -46,7 +46,7 @@ NOVA never sends `user` or `login`. In FD04 those fields address another login, 
 
 ### Findings from the specification worth knowing
 
-- **`startProcess` returns 201 with no body.** The caller does not get the instance id back. NOVA sets an `identificator` (`COOL-001`) and finds the instance again through `getTasksByUser`. Any orchestrator needs a correlation key like this.
+- **`startProcess` returns 201 with no body.** The caller does not get the instance id back. NOVA sets an `identificator` (`COOL-001` on the simulated engine; on the sandbox it adds the start time, e.g. `COOL-251008-1412`, so a server restart never reuses a reference already on the tenant) and finds the instance again through `getTasksByUser`. Any orchestrator needs a correlation key like this.
 - **`startProcess` documents 400 "Only robot can use this API".** Whether a human credential can start a process through the API must be proven on the target tenant. It is the first thing to test.
 - **Signed tasks are UI only.** This guarantees a human decision point: an agent can prepare, but not sign.
 - **`getInstanceInfo` returns 404 once an instance is completed.** Status after completion needs the history operations, which are not used yet.

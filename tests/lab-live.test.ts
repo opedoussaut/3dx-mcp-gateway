@@ -157,6 +157,11 @@ test('live engine drives the lab chain through the gateway with key, agent, then
   }
   for (const c of gw.calls)
     assert.ok(!c.url.searchParams.has('user') && !c.url.searchParams.has('login'));
+  // Live references carry the start time, so a restart never reuses one already on the tenant.
+  assert.match(run.identificator!, /^COOL-\d{6}-\d{4}$/);
+  assert.equal((writes[0].body as { identificator: string }).identificator, run.identificator);
+  const again = await o.start(CONFIGURE);
+  assert.notEqual(again.identificator, run.identificator);
 });
 
 test('live engine refuses what the contract does not admit, before any request', async () => {

@@ -127,6 +127,22 @@ export class Orchestrator {
   private count = 0;
   constructor(public engine: ProcessEngine) {}
 
+  /**
+   * Run reference sent as the instance identificator. Simulated runs count from 001. Live
+   * instances outlive this process and a sandbox already holds earlier runs, so a live
+   * reference carries the start time (COOL-251008-1412) and never repeats one of this session.
+   */
+  private identificatorFor(prefix: string, run: OrchestrationRun) {
+    if (this.engine.source !== 'live') return `${prefix}-${String(run.number).padStart(3, '0')}`;
+    const d = new Date(run.createdAt);
+    const p2 = (n: number) => String(n).padStart(2, '0');
+    const base = `${prefix}-${p2(d.getFullYear() % 100)}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}`;
+    const taken = new Set(this.runs.map((r) => r.identificator));
+    let id = base;
+    for (let i = 2; taken.has(id); i++) id = `${base}-${i}`;
+    return id;
+  }
+
   async start(prompt: string, approval: 'each' | 'all' = 'each'): Promise<OrchestrationRun> {
     const run: OrchestrationRun = {
       id: randomUUID(),
@@ -217,7 +233,7 @@ export class Orchestrator {
       (r) => r !== run && r.inputs && r.processKey === COOLING_CHAIN && r.status !== 'needs_input',
     );
     if (/\b(continue|resume|reprend\w*|finish|pick up where)\b/i.test(prompt))
-      return this.planResume(run, ctx, prompt.match(/\b(COOL-\d+)\b/i)?.[1]);
+      return this.planResume(run, ctx, prompt.match(/\b(COOL-\d+(?:-\d+)*)\b/i)?.[1]);
     if (/\b(requirement|exigence)\b/i.test(prompt)) return this.planRequirement(run, ctx);
     if (
       previous &&
@@ -300,7 +316,7 @@ export class Orchestrator {
     }
     ctx.def = def;
     ctx.inputs = inputs;
-    ctx.identificator = `${def.identificatorPrefix}-${String(run.number).padStart(3, '0')}`;
+    ctx.identificator = this.identificatorFor(def.identificatorPrefix, run);
     run.identificator = ctx.identificator;
     run.inputs = { ...inputs };
     run.stageNotes.start = `${fmt(inputs.itLoadKw, 'kW')} · ${inputs.facilityWaterC} °C · ${inputs.rackCount} racks · ${inputs.redundancy}`;
@@ -619,7 +635,7 @@ export class Orchestrator {
       return [];
     }
     ctx.def = def;
-    ctx.identificator = `${def.identificatorPrefix}-${String(run.number).padStart(3, '0')}`;
+    ctx.identificator = this.identificatorFor(def.identificatorPrefix, run);
     run.identificator = ctx.identificator;
     const statement = body.slice(0, 1000);
     const reference = sourceMatch![1].trim().slice(0, 300);
