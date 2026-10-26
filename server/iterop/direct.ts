@@ -5,6 +5,10 @@ import { LIMITS } from './configurators';
 import { checkProposal, type Envelope, type Proposal } from './proposal-check';
 import { RunJournal, runContext } from './run-context';
 import { verifyReceipt } from '../cameo/receipt';
+import { createHash } from 'node:crypto';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { coolingUsd } from '../twin/cooling-usd';
 import { EngineError, type ProcessEngine } from './simulator';
 
 /**
@@ -47,6 +51,8 @@ export type DirectOptions = {
    * accepts only a model receipt signed by that connector.
    */
   modelReceiptKey?: string;
+  /** Where view3d_build writes the OpenUSD files (default .private/twin). */
+  twinDir?: string;
   now?: () => Date;
 };
 
@@ -333,6 +339,108 @@ export function registerDirectTools(server: McpServer, o: DirectOptions) {
     },
   );
 
+  // 3D views this session generated: only these may be written to "Update 3D view".
+  const issuedViews = new Set<string>();
+  server.registerTool(
+    'view3d_build',
+    {
+      description:
+        'Generate the OpenUSD 3D view of a cooling run (no platform request) from the values this connector wrote to ITEROP for it (start values, coolant, CDU sizing, loop), linked to the system model when "Update system model" is done. Writes the .usda file locally and returns the exact values for the "Update 3D view" task, which accepts nothing else. Geometry is schematic and synthetic.',
+      inputSchema: { runReference: z.string().regex(/^[A-Z]+-[0-9-]+$/) },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async ({ runReference }) => {
+      const r = journal.get(runReference);
+      const start = r?.start ?? {};
+      const stage = (sid: string) => r?.stages[sid]?.values ?? {};
+      const coolant = stage('coolantSelection');
+      const cdu = stage('cduSizing');
+      const loop = stage('loopConfiguration');
+      const model = stage('systemModel');
+      const need: [string, unknown][] = [
+        ['start_itLoadKw', start.start_itLoadKw],
+        ['start_rackCount', start.start_rackCount],
+        ['start_facilityWaterC', start.start_facilityWaterC],
+        ['coolantSelection_fluid', coolant.coolantSelection_fluid],
+        ['cduSizing_model', cdu.cduSizing_model],
+        ['cduSizing_units', cdu.cduSizing_units],
+        ['cduSizing_dutyUnits', cdu.cduSizing_dutyUnits],
+        ['loopConfiguration_supplyC', loop.loopConfiguration_supplyC],
+        ['loopConfiguration_returnC', loop.loopConfiguration_returnC],
+        ['loopConfiguration_flowLpm', loop.loopConfiguration_flowLpm],
+        ['loopConfiguration_rackFlowLpm', loop.loopConfiguration_rackFlowLpm],
+      ];
+      const missing = need.filter(([, val]) => val === undefined).map(([k]) => k);
+      if (missing.length)
+        return text(
+          {
+            engine: engineLabel,
+            error: `This connector has no record of these values for ${runReference}: ${missing.join(', ')}. The 3D view is built only from values written to ITEROP in this run.`,
+          },
+          true,
+        );
+      const num = (val: unknown) => Number(val);
+      const modelRef = model.systemModel_reference
+        ? String(model.systemModel_reference)
+        : undefined;
+      const sysmlId = modelRef?.match(/\[([A-Za-z0-9_.:-]+)\]\s*$/)?.[1];
+      const unitModel = String(cdu.cduSizing_model);
+      const capacity = Number(
+        unitModel.match(/(\d{2,5})\s*kW/i)?.[1] ?? unitModel.match(/-(\d{2,5})\b/)?.[1],
+      );
+      const racks = num(start.start_rackCount);
+      const units = num(cdu.cduSizing_units);
+      const duty = num(cdu.cduSizing_dutyUnits);
+      const flow = num(loop.loopConfiguration_flowLpm);
+      const supply = num(loop.loopConfiguration_supplyC);
+      const ret = num(loop.loopConfiguration_returnC);
+      const fluid = String(coolant.coolantSelection_fluid);
+      const usda = coolingUsd({
+        runReference,
+        itLoadKw: num(start.start_itLoadKw),
+        rackCount: racks,
+        facilityWaterC: num(start.start_facilityWaterC),
+        coolant: fluid,
+        cduModel: unitModel,
+        cduUnits: units,
+        cduDutyUnits: duty,
+        ...(Number.isFinite(capacity) ? { cduCapacityKw: capacity } : {}),
+        supplyC: supply,
+        returnC: ret,
+        flowLpm: flow,
+        rackFlowLpm: num(loop.loopConfiguration_rackFlowLpm),
+        ...(sysmlId ? { sysml: { system: sysmlId } } : {}),
+      });
+      const dir = o.twinDir ?? '.private/twin';
+      mkdirSync(dir, { recursive: true });
+      const file = join(dir, `${runReference}.usda`);
+      writeFileSync(file, usda);
+      const sha = createHash('sha256').update(usda).digest('hex').slice(0, 12);
+      const at = (o.now ?? (() => new Date()))().toISOString().slice(0, 16).replace('T', ' ');
+      const taskValues = {
+        view3d_reference: `twin/${runReference}.usda`,
+        view3d_revision: `sha256 ${sha} · generated ${at} UTC`,
+        view3d_summary:
+          `${racks} racks, ${units} × ${unitModel} (${duty} duty, ${units - duty} standby), secondary loop ${flow} L/min at ${supply} → ${ret} °C, ${fluid}. ${modelRef ? `Linked to system model ${modelRef}.` : 'No system model linked.'} Schematic, synthetic geometry.`.slice(
+            0,
+            1500,
+          ),
+      };
+      issuedViews.add(JSON.stringify(taskValues));
+      return text({
+        engine: engineLabel,
+        taskValues,
+        file,
+        view: `npm run twin:view -- ${file.split('\\').join('/')}`,
+      });
+    },
+  );
+
   server.registerTool(
     'iterop_start_process',
     {
@@ -414,6 +522,21 @@ export function registerDirectTools(server: McpServer, o: DirectOptions) {
           throw new EngineError(
             400,
             '“Check system limits” accepts only the checkTaskValues returned by cooling_check for the proposal you used.',
+          );
+        // The 3D view must be the one view3d_build generated from this run's recorded values.
+        if (
+          taskDefinition(d, task.name)?.id === 'view3d' &&
+          !issuedViews.has(
+            JSON.stringify({
+              view3d_reference: values.view3d_reference,
+              view3d_revision: values.view3d_revision,
+              view3d_summary: values.view3d_summary,
+            }),
+          )
+        )
+          throw new EngineError(
+            400,
+            '“Update 3D view” accepts only the taskValues returned by view3d_build for this run, unchanged.',
           );
         // The model reference must come from the modelling connector, not from Claude.
         if (

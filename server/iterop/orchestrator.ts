@@ -1087,6 +1087,7 @@ const toolTitle: Record<string, string> = {
   loop: 'Run the loop calculator',
   validator: 'Run the system limit check',
   model: 'Record the system model (synthetic placeholder)',
+  view3d: 'Record the 3D view (synthetic placeholder)',
 };
 function runTool(tool: string, c: Ctx): Fields {
   const i = c.inputs!;
@@ -1094,6 +1095,7 @@ function runTool(tool: string, c: Ctx): Fields {
   if (tool === 'cdu') return tools.cdu(i);
   if (tool === 'loop') return tools.loop(i, c.outputs);
   if (tool === 'model') return tools.model(c.identificator, c.outputs, c.outputs);
+  if (tool === 'view3d') return tools.view3d(c.identificator, c.outputs, c.outputs);
   return tools.validator(i, c.outputs, c.outputs);
 }
 function noteFor(tool: string, f: Fields) {
@@ -1103,6 +1105,7 @@ function noteFor(tool: string, f: Fields) {
   if (tool === 'loop')
     return `${f.loopConfiguration_supplyC} → ${f.loopConfiguration_returnC} °C · ${f.loopConfiguration_rackFlowLpm} L/min/rack`;
   if (tool === 'model') return String(f.systemModel_reference);
+  if (tool === 'view3d') return String(f.view3d_reference);
   return String(f.systemCheck_result);
 }
 function outputsOf(def: ProcessDefinition, out: Fields) {

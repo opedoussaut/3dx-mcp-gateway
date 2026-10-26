@@ -99,6 +99,11 @@ async function runAutomated(
     const next = last.nextTask as { taskId?: string } | string;
     if (typeof next === 'object' && next?.taskId) taskId = next.taskId;
   }
+  // The 3D view comes from the connector, built from the values just written to ITEROP.
+  const view = (await call('view3d_build', { runReference: started.runReference })) as {
+    taskValues: Record<string, unknown>;
+  };
+  last = await call('iterop_complete_task', { taskId, values: view.taskValues });
   return last;
 }
 

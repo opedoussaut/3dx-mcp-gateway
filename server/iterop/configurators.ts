@@ -96,6 +96,19 @@ export function model(identificator: string | undefined, unit: Fields, loopField
   };
 }
 
+/** SYNTHETIC stand-in for the 3D view step in the lab: no file is written. */
+export function view3d(
+  identificator: string | undefined,
+  unit: Fields,
+  loopFields: Fields,
+): Fields {
+  return {
+    view3d_reference: `SYNTHETIC/${identificator ?? 'run'}.usda`,
+    view3d_revision: 'synthetic, no file written',
+    view3d_summary: `Placeholder for the 3D view: ${unit.cduSizing_units} × ${unit.cduSizing_model}, ${loopFields.loopConfiguration_flowLpm} L/min.`,
+  };
+}
+
 export function validator(input: ChainInputs, unit: Fields, loopFields: Fields): Fields {
   const findings: string[] = [];
   let result: 'PASS' | 'REVIEW' | 'FAIL' = 'PASS';

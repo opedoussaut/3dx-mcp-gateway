@@ -37,12 +37,12 @@ In **both** modes, start the same way:
 2. Show the whole design once: the inputs, a table with units, your reasoning in a few lines, and the check result.
 
 **`step` — an expert checks every stage (default)**
-- For each write in turn (start, Select coolant, Size CDUs, Configure secondary loop, Check system limits, Update system model), show that stage's values and the reasoning behind them. Say what the expert should look at, for example "flow from Q = ρ·cp·V̇·ΔT".
+- For each write in turn (start, Select coolant, Size CDUs, Configure secondary loop, Check system limits, Update system model, Update 3D view), show that stage's values and the reasoning behind them. Say what the expert should look at, for example "flow from Q = ρ·cp·V̇·ΔT".
 - Wait for the expert to **confirm or correct**. If they correct a value, adjust the dependent values, re-run `cooling_check`, and show what changed. Then write that stage.
 - The Check system limits stage always shows the independent check's result and findings, and writes exactly its `checkTaskValues`.
 
 **`final` — Claude runs the automated steps; a person validates the final result**
-- After showing the design, do not ask per stage. Start the run and complete the five automated stages in sequence, listing each one as you go.
+- After showing the design, do not ask per stage. Start the run and complete the six automated stages in sequence, listing each one as you go.
 - If `cooling_check` is FAIL, or stays REVIEW after two redesigns, **stop before writing anything** and ask the user. Never push a failing design to sign-off.
 - Finish with a summary for the validator: run reference, key values, the check result and findings, and the ITEROP link. Make clear that the configuration is not official until the engineer approves the sign-off task in ITEROP. A rejection comes back as rework (section 4).
 
@@ -72,7 +72,8 @@ In either mode:
    - Size coolant distribution units;
    - Configure secondary loop;
    - Check system limits, using exactly `checkTaskValues` from your latest `cooling_check`;
-   - Update system model (see below).
+   - Update system model (see below);
+   - Update 3D view (see below).
 
    Follow `nextTask` each time.
 7. When `nextTask` says the run waits for a person, tell the user that **Engineering sign-off** is done by an engineer in ITEROP Play, and give the link.
@@ -80,7 +81,7 @@ In either mode:
    - `signoff` holds the engineer's decision and comment. On the sandbox the decision is a Boolean shown as Approved/Rejected: use its `meaning` (Approve or Reject), not the raw `true`/`false`. If it is missing, `gaps` says so: **ask the user what the reviewer asked for**. Never invent or paraphrase a comment you were not given.
    - `stages` is the configuration that was rejected; `inputs` the envelope it was designed for. If `gaps` lists missing start values, ask for them.
    - Show the user, briefly: what was rejected, the reviewer's request, and what you will change. Then propose the rework values: revised coolant, redundancy and facility water, plus a `configurationRework_note` saying what changed and why. Follow the review mode.
-   - After the rework task, the chain runs again from Select coolant. Its `runContext` now shows the revised `inputs` and `pass: 2`; the earlier pass's outputs carry `fromEarlierPass`. Re-engineer from the revised inputs, re-run `cooling_check`, and present the new proposal next to the rejected one before the five automated tasks run again.
+   - After the rework task, the chain runs again from Select coolant. Its `runContext` now shows the revised `inputs` and `pass: 2`; the earlier pass's outputs carry `fromEarlierPass`. Re-engineer from the revised inputs, re-run `cooling_check`, and present the new proposal next to the rejected one before the six automated tasks run again.
    - Values marked `connector` are what this connector wrote; if a person changed the run in ITEROP Play since, ITEROP may differ. Mention it when it matters.
 
 **Update system model.** This task records which system model (SysML) revision describes the checked configuration. Its fields are `systemModel_reference`, `systemModel_revision` and `systemModel_summary`.
@@ -98,6 +99,12 @@ In either mode:
 - Never use or ask for the Cameo MCP Bridge's own tools (macros, deletes): only the guarded `cameo_*` tools listed here.
 - In `step` mode, show the model changes before writing the task.
 - After a rework, update the same model; the earlier reference is in `runContext.stages`.
+
+**Update 3D view.** This task records the OpenUSD 3D view of the run (`view3d_reference`, `view3d_revision`, `view3d_summary`).
+- After *Update system model*, call `view3d_build` with the run reference. The connector builds the scene from the values already written to ITEROP for this run, linked to the system model, and writes the `.usda` file locally.
+- Write its `taskValues` to the task **unchanged**: the task accepts nothing else.
+- Tell the user how to look at it: the `view` command it returns (`npm run twin:view -- …`), then <http://127.0.0.1:8765>.
+- The geometry is schematic and synthetic. Say so, and never present it as a validated layout.
 
 Task names may carry a lane prefix, such as "[Operator (NOVA acts as you)] Select coolant"; it is the same task. Run references look like `COOL-YYMMDD-HHMMSS` (`COOL-251008-141210`).
 

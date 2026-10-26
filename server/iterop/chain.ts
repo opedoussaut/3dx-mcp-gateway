@@ -19,7 +19,7 @@ export type VariableDefinition = {
   max?: string;
   unit?: string;
 };
-export type ToolName = 'coolant' | 'cdu' | 'loop' | 'validator' | 'model';
+export type ToolName = 'coolant' | 'cdu' | 'loop' | 'validator' | 'model' | 'view3d';
 export type TaskDefinition = {
   id: string;
   name: string;
@@ -175,6 +175,25 @@ export const definitions: readonly ProcessDefinition[] = [
           ),
           v('systemModel_revision', 'Model revision', 'TEXT', 'Revision or commit holding it.'),
           v('systemModel_summary', 'Model changes', 'TEXT_AREA', 'What was created or updated.'),
+        ],
+      },
+      {
+        id: 'view3d',
+        name: 'Update 3D view',
+        description:
+          'Record the OpenUSD 3D view generated from the values written in this run, linked to the system model.',
+        priority: 2,
+        assignee: 'self',
+        tool: 'view3d',
+        expectedFields: [
+          v('view3d_reference', '3D view file', 'TEXT', 'The OpenUSD file of this run.'),
+          v('view3d_revision', '3D view revision', 'TEXT', 'Content hash and generation time.'),
+          v(
+            'view3d_summary',
+            '3D view content',
+            'TEXT_AREA',
+            'What the scene shows and its model link.',
+          ),
         ],
       },
       {

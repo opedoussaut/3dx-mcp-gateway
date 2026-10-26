@@ -26,6 +26,7 @@
         <bpmn:flowNodeRef>loopConfiguration</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>systemCheck</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>systemModel</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>view3d</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>configurationRework</bpmn:flowNodeRef>
       </bpmn:lane>
       <bpmn:lane id="Lane_reviewer" name="Engineering reviewer">
@@ -61,11 +62,16 @@
     <bpmn:userTask id="systemModel" name="Update system model">
       <bpmn:documentation>Output variables: systemModel_reference (TEXT), systemModel_revision (TEXT), systemModel_summary (TEXT_AREA). Assigned to the operator. Records the system model (SysML) revision that describes the checked configuration.</bpmn:documentation>
       <bpmn:incoming>Flow_check_model</bpmn:incoming>
-      <bpmn:outgoing>Flow_model_signoff</bpmn:outgoing>
+      <bpmn:outgoing>Flow_model_view3d</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="view3d" name="Update 3D view">
+      <bpmn:documentation>Output variables: view3d_reference (TEXT), view3d_revision (TEXT), view3d_summary (TEXT_AREA). Assigned to the operator. Records the OpenUSD 3D view generated from the values written in this run, linked to the system model.</bpmn:documentation>
+      <bpmn:incoming>Flow_model_view3d</bpmn:incoming>
+      <bpmn:outgoing>Flow_view3d_signoff</bpmn:outgoing>
     </bpmn:userTask>
     <bpmn:userTask id="engineeringSignoff" name="Engineering sign-off">
       <bpmn:documentation>Signature task, human only. Output variables: engineeringSignoff_decision (SELECT Approve##Reject), engineeringSignoff_comment (TEXT_AREA, optional). Assign to a reviewer who is not the operator; enable signature.</bpmn:documentation>
-      <bpmn:incoming>Flow_model_signoff</bpmn:incoming>
+      <bpmn:incoming>Flow_view3d_signoff</bpmn:incoming>
       <bpmn:outgoing>Flow_signoff_decision</bpmn:outgoing>
     </bpmn:userTask>
     <bpmn:exclusiveGateway id="signoffDecision" name="Decision?">
@@ -86,7 +92,8 @@
     <bpmn:sequenceFlow id="Flow_cdu_loop" sourceRef="cduSizing" targetRef="loopConfiguration" />
     <bpmn:sequenceFlow id="Flow_loop_check" sourceRef="loopConfiguration" targetRef="systemCheck" />
     <bpmn:sequenceFlow id="Flow_check_model" sourceRef="systemCheck" targetRef="systemModel" />
-    <bpmn:sequenceFlow id="Flow_model_signoff" sourceRef="systemModel" targetRef="engineeringSignoff" />
+    <bpmn:sequenceFlow id="Flow_model_view3d" sourceRef="systemModel" targetRef="view3d" />
+    <bpmn:sequenceFlow id="Flow_view3d_signoff" sourceRef="view3d" targetRef="engineeringSignoff" />
     <bpmn:sequenceFlow id="Flow_signoff_decision" sourceRef="engineeringSignoff" targetRef="signoffDecision" />
     <bpmn:sequenceFlow id="Flow_approve" name="Approve" sourceRef="signoffDecision" targetRef="approved">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">engineeringSignoff_decision == 'Approve'</bpmn:conditionExpression>
@@ -99,13 +106,13 @@
   <bpmndi:BPMNDiagram id="Diagram_coolingChain">
     <bpmndi:BPMNPlane id="Plane_coolingChain" bpmnElement="Collaboration_coolingChain">
       <bpmndi:BPMNShape id="Participant_coolingChain_di" bpmnElement="Participant_coolingChain" isHorizontal="true">
-        <dc:Bounds x="120" y="60" width="1180" height="420" />
+        <dc:Bounds x="120" y="60" width="1240" height="420" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_operator_di" bpmnElement="Lane_operator" isHorizontal="true">
-        <dc:Bounds x="150" y="60" width="1150" height="220" />
+        <dc:Bounds x="150" y="60" width="1210" height="220" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_reviewer_di" bpmnElement="Lane_reviewer" isHorizontal="true">
-        <dc:Bounds x="150" y="280" width="1150" height="200" />
+        <dc:Bounds x="150" y="280" width="1210" height="200" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="start_di" bpmnElement="start">
         <dc:Bounds x="200" y="162" width="36" height="36" />
@@ -125,6 +132,9 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="systemModel_di" bpmnElement="systemModel">
         <dc:Bounds x="905" y="140" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="view3d_di" bpmnElement="view3d">
+        <dc:Bounds x="1200" y="140" width="120" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="configurationRework_di" bpmnElement="configurationRework">
         <dc:Bounds x="1050" y="140" width="120" height="80" />
@@ -155,8 +165,11 @@
       <bpmndi:BPMNEdge id="Flow_check_model_di" bpmnElement="Flow_check_model">
         <di:waypoint x="880" y="180" /><di:waypoint x="905" y="180" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_model_signoff_di" bpmnElement="Flow_model_signoff">
-        <di:waypoint x="965" y="220" /><di:waypoint x="965" y="340" />
+      <bpmndi:BPMNEdge id="Flow_model_view3d_di" bpmnElement="Flow_model_view3d">
+        <di:waypoint x="965" y="220" /><di:waypoint x="965" y="245" /><di:waypoint x="1260" y="245" /><di:waypoint x="1260" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_view3d_signoff_di" bpmnElement="Flow_view3d_signoff">
+        <di:waypoint x="1320" y="180" /><di:waypoint x="1340" y="180" /><di:waypoint x="1340" y="300" /><di:waypoint x="1000" y="300" /><di:waypoint x="1000" y="340" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_signoff_decision_di" bpmnElement="Flow_signoff_decision">
         <di:waypoint x="1040" y="380" /><di:waypoint x="1090" y="380" />

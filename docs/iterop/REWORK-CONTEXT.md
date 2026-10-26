@@ -24,7 +24,7 @@ This example is the same run as the automated test *"after a rejection the rewor
 2. **First pass:**
    - Claude proposes PG25 coolant, 4 × CDU-500 (3 duty units and 1 spare, 80 % utilisation), a 35 → 45 °C secondary loop and 1,810 L/min of total flow.
    - `cooling_check` returns PASS.
-   - Claude starts `COOL-261026-101500` and completes the five automated stages; the connector records each write.
+   - Claude starts `COOL-261026-101500` and completes the six automated stages; the connector records each write.
 3. **Sign-off:** the engineer rejects it in ITEROP Play with the comment "Use water and 2N redundancy."
 4. **Rework:** `iterop_list_my_tasks` shows *Rework configuration* with `rework: true`. `iterop_get_task` returns (shortened):
 
@@ -46,7 +46,7 @@ This example is the same run as the automated test *"after a rejection the rewor
 5. **Second pass:**
    - *Select coolant* shows `pass: 2` and the revised inputs; the PG25 design carries `fromEarlierPass: 1`.
    - Claude redesigns with water and 6 × CDU-500 (2N, 80 % utilisation), about 1,727 L/min in total and 108 L/min per rack.
-   - It re-checks, shows the new design next to the rejected one, completes the five stages, and the run goes back to the engineer.
+   - It re-checks, shows the new design next to the rejected one, completes the six stages, and the run goes back to the engineer.
 
 **On the live sandbox today**, the robot account cannot read the run, and the API does not return the sign-off values (see *Live result*). In step 4, the inputs and stages therefore come from the connector's record, there is no `signoff`, and `gaps` says the decision and comment cannot be read. Claude asks the user what the reviewer asked for.
 

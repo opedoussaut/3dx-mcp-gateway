@@ -344,5 +344,5 @@ test('"Update system model" in ITEROP accepts only a signed receipt from the gua
     },
   });
   assert.equal(done.isError, undefined, JSON.stringify(done));
-  assert.match(String(done.nextTask), /waits for a person/);
+  assert.equal(done.nextTask.task, 'Update 3D view');
 });
