@@ -29,7 +29,7 @@
 - It has orbit, zoom and pan, and rotates Z-up stages so the floor lies flat.
 - Clicking a part shows its name and `nova:` values.
 - The local server serves only the viewer page and the one scene file. `.env` and `.private/` are not reachable.
-- To show another file: `npm run twin:view -- path/to/scene.usda`.
+- With no argument it shows the newest `.usda` in `.private/twin`. Give a path to show another file. An unknown name lists the available files.
 
 
 `blender -b --factory-startup --python scripts/twin/render_blender.py -- <in.usda> <out.png>` (absolute paths) imports the file and renders a preview. The import doubles as a validity check: all 89 prims of the example import. The file also opens in any OpenUSD viewer, for example USD Composer or usdview.
@@ -54,7 +54,7 @@ The cooling chain has a seventh task, between *Update system model* and *Enginee
 | `view3d_revision` | TEXT | `sha256 1a2b3c4d5e6f · generated 2026-10-26 23:51 UTC` |
 | `view3d_summary` | TEXT_AREA | `16 racks, 4 × CDU-500 (3 duty, 1 standby), secondary loop 1810 L/min at 35 → 45 °C, PG25. Linked to system model …` |
 
-- **To view a run:** `npm run twin:view -- .private/twin/<run>.usda`, then <http://127.0.0.1:8765>.
+- **To view a run:** `npm run twin:view` opens the newest scene in `.private/twin`. For a specific run, use `npm run twin:view -- .private/twin/COOL-261026-235127.usda`, replacing the name with the actual run reference. Then open <http://127.0.0.1:8765>.
 - **NOVA lab:** a labelled synthetic placeholder; no file is written.
 
 ### Sandbox: add the task in the designer

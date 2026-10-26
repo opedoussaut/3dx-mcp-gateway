@@ -146,11 +146,16 @@ try {
   console.error(e);
 }
 
-addEventListener('resize', () => {
-  camera.aspect = innerWidth / innerHeight;
+// Follow the container's size (also when the page was opened in a background tab at 0 × 0).
+const view = document.getElementById('view');
+new ResizeObserver(() => {
+  const w = view.clientWidth || innerWidth;
+  const h = view.clientHeight || innerHeight;
+  if (!w || !h) return;
+  camera.aspect = w / h;
   camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-});
+  renderer.setSize(w, h);
+}).observe(view);
 renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
 </script>
 </body>
