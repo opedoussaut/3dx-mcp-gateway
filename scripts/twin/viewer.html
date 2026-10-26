@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NOVA · OpenUSD viewer</title>
+<style>
+  :root { --ink: #10283f; --muted: #566a7c; --line: #d6e1e9; --panel: rgba(255,255,255,.92); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #e9eef2; color: var(--ink); font: 14px/1.45 "Segoe UI", system-ui, sans-serif; }
+  #view { position: fixed; inset: 0; }
+  .panel { position: fixed; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  #info { top: 16px; left: 16px; max-width: 340px; }
+  #info h1 { font-size: 15px; margin: 0 0 4px; }
+  #info p { margin: 0; color: var(--muted); font-size: 13px; }
+  #legend { bottom: 16px; left: 16px; display: grid; gap: 6px; font-size: 13px; }
+  #legend span { display: inline-flex; align-items: center; gap: 8px; }
+  #legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  #pick { top: 16px; right: 16px; width: 300px; display: none; }
+  #pick h2 { font-size: 14px; margin: 0 0 6px; }
+  #pick dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 13px; }
+  #pick dt { color: var(--muted); }
+  #status { bottom: 16px; right: 16px; font-size: 12px; color: var(--muted); }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.183.2/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.183.2/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="view"></div>
+<div id="info" class="panel">
+  <h1 id="title">OpenUSD scene</h1>
+  <p id="sub">Drag to orbit · scroll to zoom · right-drag to pan · click a part.</p>
+</div>
+<div id="legend" class="panel" aria-label="Legend">
+  <span><i style="background:#1f2124"></i>Racks</span>
+  <span><i style="background:#0b6b6e"></i>CDU, duty</span>
+  <span><i style="background:#739a9e"></i>CDU, standby</span>
+  <span><i style="background:#1768a4"></i>Secondary supply</span>
+  <span><i style="background:#c7332a"></i>Secondary return</span>
+  <span><i style="background:#338c40"></i>Facility water</span>
+</div>
+<div id="pick" class="panel" aria-live="polite"><h2 id="pickName"></h2><dl id="pickAttrs"></dl></div>
+<div id="status" class="panel">Loading…</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { USDLoader } from 'three/addons/loaders/USDLoader.js';
+
+const status = document.getElementById('status');
+const params = new URLSearchParams(location.search);
+const url = params.get('file') || 'scene.usda';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.getElementById('view').appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xe9eef2);
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.05, 500);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a96a3, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+sun.position.set(6, -8, 12);
+scene.add(sun);
+
+/** The scene's own attributes, read from the text so the viewer can show nova: values. */
+async function readAttributes() {
+  const text = await (await fetch(url)).text();
+  const attrs = new Map();
+  const stack = [];
+  let pending = null;
+  for (const line of text.split('\n')) {
+    const def = line.match(/^\s*def \w+ "([^"]+)"/);
+    if (def) pending = def[1];
+    if (/^\s*\{\s*$/.test(line)) { stack.push(pending); pending = null; }
+    if (/^\s*\}\s*$/.test(line)) stack.pop();
+    const a = line.match(/custom \w+ nova:(\w+) = (.+)$/);
+    if (a && stack.length) {
+      const name = stack[stack.length - 1];
+      if (!attrs.has(name)) attrs.set(name, {});
+      attrs.get(name)[a[1]] = a[2].replace(/^"|"$/g, '');
+    }
+  }
+  const up = (text.match(/upAxis = "(\w)"/) || [])[1] || 'Y';
+  const doc = (text.match(/doc = "([^"]*)"/) || [])[1];
+  return { attrs, up, doc };
+}
+
+try {
+  const [{ attrs, up, doc }, model] = await Promise.all([readAttributes(), new USDLoader().loadAsync(url)]);
+  // three.js is Y-up; rotate a Z-up stage so the floor lies flat.
+  if (up === 'Z') model.rotation.x = -Math.PI / 2;
+  scene.add(model);
+  model.updateMatrixWorld(true);
+
+  let meshes = 0;
+  model.traverse((o) => { if (o.isMesh) meshes++; });
+  const box = new THREE.Box3().setFromObject(model);
+  const centre = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3()).length();
+  camera.position.copy(centre).add(new THREE.Vector3(0.75, 0.6, 0.9).normalize().multiplyScalar(size * 1.05));
+  controls.target.copy(centre);
+  controls.update();
+
+  const root = attrs.get('CoolingSystem') || {};
+  document.getElementById('title').textContent = root.coolant
+    ? `Liquid cooling · ${Number(root.itLoadKw) / 1000} MW · ${root.coolant}`
+    : 'OpenUSD scene';
+  if (doc) document.getElementById('sub').textContent = doc;
+  status.textContent = `${url} · ${meshes} meshes · ${up}-up`;
+
+  // Click a part: show its name and its nova: attributes (and those of its group).
+  const ray = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+  const pick = document.getElementById('pick');
+  let highlighted = null;
+  renderer.domElement.addEventListener('click', (e) => {
+    ndc.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const hit = ray.intersectObject(model, true).find((h) => !/Floor/.test(h.object.name));
+    if (highlighted) { highlighted.material.emissive?.setHex(0); highlighted = null; }
+    if (!hit) { pick.style.display = 'none'; return; }
+    const o = hit.object;
+    if (o.material?.emissive) { o.material = o.material.clone(); o.material.emissive.setHex(0x333333); highlighted = o; }
+    const names = [];
+    for (let p = o; p && p !== model; p = p.parent) if (p.name) names.push(p.name);
+    const values = Object.assign({}, ...names.slice().reverse().map((n) => attrs.get(n) || {}));
+    document.getElementById('pickName').textContent = names.slice(0, 2).reverse().join(' / ') || o.name;
+    const dl = document.getElementById('pickAttrs');
+    dl.replaceChildren(...Object.entries(values).filter(([, v]) => v !== '').flatMap(([k, v]) => {
+      const dt = document.createElement('dt'); dt.textContent = k;
+      const dd = document.createElement('dd'); dd.style.margin = '0'; dd.textContent = v;
+      return [dt, dd];
+    }));
+    pick.style.display = 'block';
+  });
+} catch (e) {
+  status.textContent = `Could not load ${url}: ${e.message || e}`;
+  console.error(e);
+}
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+</script>
+</body>
+</html>

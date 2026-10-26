@@ -24,6 +24,14 @@
 
 ## Checking and viewing
 
+**In the browser:** `npm run twin:view`, then open <http://127.0.0.1:8765>.
+- The viewer uses three.js 0.183 `USDLoader`, which reads `.usda` directly.
+- It has orbit, zoom and pan, and rotates Z-up stages so the floor lies flat.
+- Clicking a part shows its name and `nova:` values.
+- The local server serves only the viewer page and the one scene file. `.env` and `.private/` are not reachable.
+- To show another file: `npm run twin:view -- path/to/scene.usda`.
+
+
 `blender -b --factory-startup --python scripts/twin/render_blender.py -- <in.usda> <out.png>` (absolute paths) imports the file and renders a preview. The import doubles as a validity check: all 89 prims of the example import. The file also opens in any OpenUSD viewer, for example USD Composer or usdview.
 
 A note on implicit shapes: Blender 5.2 imports material bindings on explicit meshes but not on implicit `Cube`/`Cylinder` prims. The generator therefore writes meshes.
