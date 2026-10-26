@@ -33,7 +33,8 @@ Claude Desktop / Code (user's Claude Enterprise account) ── MCP stdio ──
 | `iterop_list_startable_processes` | read | Filtered to the processes in the contract. |
 | `iterop_get_process_model` | read | `getBasicProcessInfo` plus the lab model: start form, tasks and field ids. |
 | `iterop_list_my_tasks` | read | Filtered to lab processes by run-reference prefix or task name; a count of hidden tasks only. |
-| `iterop_get_task` / `iterop_get_instance` | read | Field ids are translated to lab ids. |
+| `iterop_get_task` | read | Only this account's open lab tasks. Returns the form and a `runContext`: start values, earlier stage outputs, and the sign-off decision and comment when ITEROP shows them. Each value is labelled `iterop` or `connector`, and gaps are named. |
+| `iterop_get_instance` | read | Field ids are translated to lab ids. |
 | `cooling_check` | local | Deterministic check of Claude's proposal (§4). |
 | `iterop_start_process` | write (destructive hint) | Run reference `PREFIX-YYMMDD-HHMMSS`; finds the new instance through `getTasksByUser`. |
 | `iterop_complete_task` | write (destructive hint) | Refuses signature tasks; the check task accepts only `cooling_check` output. |
@@ -130,11 +131,12 @@ The output is PASS, REVIEW or FAIL with findings, plus `checkTaskValues`. The co
 
 ## 7. Verification
 
-- **Automated tests:** 76 Node tests on the `claude-iterop-orchestrator` branch:
+- **Automated tests:** 79 Node tests on the `claude-iterop-orchestrator` branch:
   - the full chain through the connector on the simulated engine, and through a gateway double;
   - filtering of foreign tasks;
   - signature refusal;
   - refusal of a self-graded check;
+  - rework context after a rejection, both when ITEROP exposes the data and when only the connector's record is available, and the record surviving a restart;
   - checker FAIL and REVIEW cases;
   - blockers;
   - review-mode reporting;
@@ -151,6 +153,6 @@ The output is PASS, REVIEW or FAIL with findings, plus `checkTaskValues`. The co
 ## 9. Open items
 
 1. A complete live run through the direct connector, including Claude's design, the automated stages, the sign-off, and a rejection followed by rework.
-2. Showing the start values and earlier outputs in each task's "Information to display", so that rework can read context.
+2. Rework context is implemented: `runContext` combines ITEROP data with the connector's own run record. Still to do on the sandbox: display the sign-off decision and comment in the rework task's "Information to display", then verify it in a live rejection.
 3. Production path: agree the route, account and roles with the platform owner, a security review, real engineering rules instead of `LIMITS`, and a decision on whether step-mode confirmation must be enforceable outside the chat (for example, approval in the NOVA page).
 4. A hosted or multi-user version, which needs a deliberate authentication, storage and network design. The current runtime is single-operator and local.

@@ -250,7 +250,8 @@ test('the stdio server starts on the simulated engine by default', async () => {
   const env = Object.fromEntries(
     Object.entries(process.env).filter((e): e is [string, string] => e[1] !== undefined),
   );
-  delete env.ITEROP_MCP_ENGINE;
+  // Present but empty, so the server's .env loading (which never overwrites) cannot select live.
+  env.ITEROP_MCP_ENGINE = '';
   await client.connect(
     new StdioClientTransport({
       command: process.execPath,
@@ -275,4 +276,128 @@ test('the review mode is the operator’s setting and is reported to Claude', as
   const final = await (await connect({ ...base, review: 'final' })).call('iterop_connection');
   assert.equal(final.reviewMode, 'final');
   assert.match(final.reviewRule, /validates the final result at the sign-off/);
+});
+
+type Ctx = {
+  pass?: number;
+  inputs: { id: string; value: unknown; source: string }[];
+  stages: {
+    task: string;
+    values: { id: string; value: unknown; source: string }[];
+    fromEarlierPass?: number;
+  }[];
+  signoff?: { id: string; value: unknown; source: string }[];
+  gaps: string[];
+};
+const valueOf = (entries: { id: string; value: unknown }[] | undefined, id: string) =>
+  entries?.find((e) => e.id === id)?.value;
+
+test('after a rejection the rework task carries the run: inputs, each stage, the reviewer’s comment', async () => {
+  const engine = new SyntheticEngine();
+  const { call } = await connect({ engine, processes: definitions.map((d) => d.key) });
+  const { started } = await driveChain(call);
+  engine.signAsReviewer(engine.reviewerQueue()[0].id, 'Reject', 'Use water and 2N redundancy.');
+
+  const [rework] = (await call('iterop_list_my_tasks')).tasks;
+  assert.equal(rework.rework, true);
+  const got = await call('iterop_get_task', { taskId: rework.taskId });
+  const ctx: Ctx = got.runContext;
+  assert.equal(got.runContext.runReference, started.runReference);
+  assert.equal(ctx.pass, 1);
+  assert.equal(valueOf(ctx.inputs, 'start_itLoadKw'), 1200);
+  assert.deepEqual(
+    ctx.stages.map((s) => s.task),
+    [
+      'Select coolant',
+      'Size coolant distribution units',
+      'Configure secondary loop',
+      'Check system limits',
+    ],
+  );
+  assert.equal(valueOf(ctx.stages[0].values, 'coolantSelection_fluid'), 'PG25');
+  assert.equal(valueOf(ctx.signoff, 'engineeringSignoff_decision'), 'Reject');
+  assert.equal(valueOf(ctx.signoff, 'engineeringSignoff_comment'), 'Use water and 2N redundancy.');
+  assert.ok(ctx.signoff!.every((e) => e.source === 'iterop'));
+  assert.deepEqual(ctx.gaps, []);
+
+  const done = await call('iterop_complete_task', {
+    taskId: rework.taskId,
+    values: {
+      configurationRework_coolant: 'water',
+      configurationRework_redundancy: '2N',
+      configurationRework_facilityWaterC: 32,
+      configurationRework_note: 'Water and 2N, as the reviewer asked.',
+    },
+  });
+  // The second pass sees the revised inputs, and the first pass's outputs as earlier-pass context.
+  const second: Ctx = (await call('iterop_get_task', { taskId: done.nextTask.taskId })).runContext;
+  assert.equal(second.pass, 2);
+  assert.equal(valueOf(second.inputs, 'start_coolant'), 'water');
+  assert.equal(valueOf(second.inputs, 'start_redundancy'), '2N');
+  assert.equal(second.stages.find((s) => s.task === 'Select coolant')?.fromEarlierPass, 1);
+});
+
+test('when ITEROP shows little, the context falls back on what the connector wrote and names the gaps', async () => {
+  const gw = gatewayDouble();
+  // A run-only account: tasks display no earlier data and the instance is forbidden.
+  const fetcher: typeof fetch = async (input, init) => {
+    const path = new URL(String(input)).pathname;
+    if (/\/runtime\/instances\//.test(path))
+      return new Response(JSON.stringify({ code: 403, message: 'User not authorized.' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    const res = await gw.fetcher(input, init);
+    if (/\/runtime\/tasks\/[^/]+$/.test(path) && (init?.method ?? 'GET') === 'GET' && res.ok)
+      return new Response(JSON.stringify({ ...(await res.json()), providedData: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    return res;
+  };
+  const cfg = config();
+  const { call } = await connect({
+    engine: createLiveEngine(cfg, fetcher)!,
+    processes: labLiveStatus(cfg).settings.processes,
+  });
+  await driveChain(call);
+  gw.engine.signAsReviewer(gw.engine.reviewerQueue()[0].id, 'Reject', 'Too warm.');
+  const [rework] = (await call('iterop_list_my_tasks')).tasks;
+  const ctx: Ctx = (await call('iterop_get_task', { taskId: rework.taskId })).runContext;
+  assert.equal(valueOf(ctx.inputs, 'start_rackCount'), 16);
+  assert.ok(
+    [...ctx.inputs, ...ctx.stages.flatMap((s) => s.values)].every((e) => e.source === 'connector'),
+  );
+  assert.equal(ctx.stages.length, 4);
+  assert.equal(ctx.signoff, undefined);
+  assert.ok(ctx.gaps.some((g) => /getInstanceInfo 403/.test(g)));
+  assert.ok(ctx.gaps.some((g) => /decision and comment .* not readable/.test(g)));
+  // The connector never invents the reviewer's words.
+  assert.ok(!JSON.stringify(ctx).includes('Too warm'));
+});
+
+test('the run record survives a restart of the connector, and foreign tasks stay unreadable', async () => {
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { RunJournal } = await import('../server/iterop/run-context');
+  const dir = mkdtempSync(join(tmpdir(), 'iterop-runs-'));
+  try {
+    const file = join(dir, 'runs.json');
+    const d = definitions[0];
+    const first = new RunJournal(file);
+    first.started('COOL-1', d.key, { start_itLoadKw: 900 });
+    first.completed('COOL-1', d, 'coolantSelection', { coolantSelection_fluid: 'water' });
+    const reloaded = new RunJournal(file).get('COOL-1');
+    assert.equal(reloaded?.start.start_itLoadKw, 900);
+    assert.equal(reloaded?.stages.coolantSelection.values.coolantSelection_fluid, 'water');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+  const engine = new SyntheticEngine();
+  const { call } = await connect({ engine, processes: definitions.map((d) => d.key) });
+  await driveChain(call);
+  const signoff = engine.reviewerQueue()[0];
+  const res = await call('iterop_get_task', { taskId: signoff.id });
+  assert.equal(res.isError, true);
 });

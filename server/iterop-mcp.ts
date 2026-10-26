@@ -5,6 +5,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { definitions } from './iterop/chain';
 import { registerDirectTools } from './iterop/direct';
 import { createLiveEngine, labLiveStatus, loadLabLiveConfig } from './iterop/lab-live';
+import { RunJournal } from './iterop/run-context';
 import { SyntheticEngine } from './iterop/simulator';
 
 /**
@@ -33,6 +34,8 @@ if (process.env.ITEROP_MCP_ENGINE === 'live') {
     play: status.play?.instance,
     blockers: engine ? [] : config.blockers,
     review,
+    // Live runs outlive this process (a sign-off may come days later): keep the record locally.
+    journal: new RunJournal('.private/iterop-runs.json'),
   });
 } else {
   registerDirectTools(server, {

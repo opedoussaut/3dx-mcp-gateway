@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { definition, definitions, sameTask, type ProcessDefinition } from './chain';
 import { LIMITS } from './configurators';
 import { checkProposal, type Envelope, type Proposal } from './proposal-check';
+import { RunJournal, runContext } from './run-context';
 import { EngineError, type ProcessEngine } from './simulator';
 
 /**
@@ -38,6 +39,8 @@ export type DirectOptions = {
    * sign-off task in ITEROP.
    */
   review?: 'step' | 'final';
+  /** What this connector wrote per run, for the run context of later tasks. In memory by default. */
+  journal?: RunJournal;
   now?: () => Date;
 };
 
@@ -83,6 +86,7 @@ export function registerDirectTools(server: McpServer, o: DirectOptions) {
     ? 'Live sandbox ITEROP through the API Gateway; synthetic test processes only.'
     : 'Simulated ITEROP engine; no platform request.';
   const admitted = (key: string) => o.processes.includes(key);
+  const journal = o.journal ?? new RunJournal();
   const link = (key: string | undefined, instanceId?: string | null) =>
     key && instanceId && /^[A-Za-z0-9_.:-]+$/.test(instanceId) && o.play?.[key]
       ? o.play[key].replace('{instanceId}', encodeURIComponent(instanceId))
@@ -218,6 +222,7 @@ export function registerDirectTools(server: McpServer, o: DirectOptions) {
               instanceId: t.process?.instanceId,
               process: d.key,
               signatureTask: Boolean(taskDefinition(d, t.name)?.signature),
+              rework: taskDefinition(d, t.name)?.id === d.rework?.id || undefined,
               openInIterop: link(d.key, t.process?.instanceId),
             };
           }),
@@ -229,13 +234,45 @@ export function registerDirectTools(server: McpServer, o: DirectOptions) {
   server.registerTool(
     'iterop_get_task',
     {
-      description: `${note} One task's form: the fields it expects and any data already provided (getTaskInstanceInformations).`,
+      description: `${note} One of this connector's open lab tasks: the fields it expects, any data already provided (getTaskInstanceInformations) and its runContext — the run's start values, each earlier stage's outputs and, after a rejection, the engineer's decision and comment, each labelled with where it came from, plus any gaps. Read it before completing a task, and always before a rework.`,
       inputSchema: { taskId: z.string().min(1).max(200) },
       annotations: read,
     },
     async ({ taskId }) =>
       blocked() ??
-      guard(async () => ({ task: await o.engine.getTaskInstanceInformations(taskId) })),
+      guard(async () => {
+        const mine = (await myTasks()).lab.find((t) => t.id === taskId);
+        if (!mine)
+          throw new EngineError(404, 'No open lab task with this id is assigned to this account.');
+        const d = processOf(mine)!;
+        const task = (await o.engine.getTaskInstanceInformations(taskId)) as {
+          providedData?: { id?: string | null; value?: unknown }[] | null;
+        };
+        const gaps: string[] = [];
+        let variables: { id?: string | null; value?: unknown }[] | null | undefined;
+        const instanceId = mine.process?.instanceId;
+        if (instanceId)
+          try {
+            variables = ((await o.engine.getInstanceInfo(instanceId)) as { variables?: [] })
+              .variables;
+          } catch (e) {
+            if (!(e instanceof EngineError)) throw e;
+            gaps.push(
+              `The run's variables are not readable by this account (getInstanceInfo ${e.status}): only this task's data and the connector's own record are used.`,
+            );
+          }
+        return {
+          task,
+          runContext: runContext({
+            definition: d,
+            runReference: mine.process?.identificator,
+            taskId: taskDefinition(d, mine.name)?.id,
+            iterop: [task.providedData, variables],
+            record: journal.get(mine.process?.identificator),
+            gaps,
+          }),
+        };
+      }),
   );
 
   server.registerTool(
@@ -316,6 +353,7 @@ export function registerDirectTools(server: McpServer, o: DirectOptions) {
             runReference ??
             `${d.identificatorPrefix}-${p2(t.getFullYear() % 100)}${p2(t.getMonth() + 1)}${p2(t.getDate())}-${p2(t.getHours())}${p2(t.getMinutes())}${p2(t.getSeconds())}`;
           await o.engine.startProcess(processKey, { identificator, data: values });
+          journal.started(identificator, processKey, values);
           // startProcess returns no body: find the new instance by its run reference.
           const next = (await myTasks()).lab.find(
             (x) => x.process?.identificator === identificator,
@@ -370,6 +408,12 @@ export function registerDirectTools(server: McpServer, o: DirectOptions) {
             '“Check system limits” accepts only the checkTaskValues returned by cooling_check for the proposal you used.',
           );
         await o.engine.completeTask(taskId, { data: values });
+        journal.completed(
+          task.process?.identificator,
+          d,
+          taskDefinition(d, task.name)?.id ?? taskId,
+          values,
+        );
         const next = (await myTasks()).lab.find(
           (x) => x.process?.identificator === task.process?.identificator,
         );

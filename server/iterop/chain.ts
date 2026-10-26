@@ -45,6 +45,8 @@ export type ProcessDefinition = {
   tasks: TaskDefinition[];
   /** Task routed back to the operator when the signature task is rejected. */
   rework?: TaskDefinition;
+  /** Rework field id → the start value it replaces before the chain runs again. */
+  reworkRevises?: Record<string, string>;
 };
 
 const v = (
@@ -193,6 +195,11 @@ export const definitions: readonly ProcessDefinition[] = [
         }),
         v('configurationRework_note', 'Rework note', 'TEXT_AREA', 'What changed and why.'),
       ],
+    },
+    reworkRevises: {
+      configurationRework_coolant: 'start_coolant',
+      configurationRework_redundancy: 'start_redundancy',
+      configurationRework_facilityWaterC: 'start_facilityWaterC',
     },
   },
   {

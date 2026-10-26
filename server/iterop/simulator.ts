@@ -244,12 +244,7 @@ export class SyntheticEngine implements ProcessEngine {
     }
     if (d.rework && t.def.id === d.rework.id) {
       // Revised inputs replace the start values, then the chain runs again from its first task.
-      const map: Record<string, string> = {
-        configurationRework_coolant: 'start_coolant',
-        configurationRework_redundancy: 'start_redundancy',
-        configurationRework_facilityWaterC: 'start_facilityWaterC',
-      };
-      for (const [from, to] of Object.entries(map)) {
+      for (const [from, to] of Object.entries(d.reworkRevises ?? {})) {
         const startDef = d.startVariables.find((s) => s.id === to)!;
         i.variables.set(to, { def: startDef, value: values.get(from) });
       }

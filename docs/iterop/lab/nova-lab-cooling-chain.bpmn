@@ -71,7 +71,7 @@
       <bpmn:incoming>Flow_approve</bpmn:incoming>
     </bpmn:endEvent>
     <bpmn:userTask id="configurationRework" name="Rework configuration">
-      <bpmn:documentation>Hand-back to the operator after a rejection. Show engineeringSignoff_comment. Output variables: configurationRework_coolant (SELECT auto##water##PG25), configurationRework_redundancy (SELECT N##N+1##2N), configurationRework_facilityWaterC (DECIMAL 10-45), configurationRework_note (TEXT_AREA). Map the revised values onto start_coolant, start_redundancy and start_facilityWaterC.</bpmn:documentation>
+      <bpmn:documentation>Hand-back to the operator after a rejection. Information to display: engineeringSignoff_decision and engineeringSignoff_comment (the connector reads the reviewer's words only from here or from the instance). Output variables: configurationRework_coolant (SELECT auto##water##PG25), configurationRework_redundancy (SELECT N##N+1##2N), configurationRework_facilityWaterC (DECIMAL 10-45), configurationRework_note (TEXT_AREA). Map the revised values onto start_coolant, start_redundancy and start_facilityWaterC.</bpmn:documentation>
       <bpmn:incoming>Flow_reject</bpmn:incoming>
       <bpmn:outgoing>Flow_rework_coolant</bpmn:outgoing>
     </bpmn:userTask>

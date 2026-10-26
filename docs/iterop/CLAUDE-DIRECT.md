@@ -33,6 +33,17 @@ There is no tool for signing, reassigning, stopping, deleting, deploying or righ
 
 In both modes the "Check system limits" task accepts only the independent check's result, and sign-off is always a person in ITEROP.
 
+**Run context, for rework.** `iterop_get_task` returns a `runContext` with each task:
+- the run's start values;
+- each earlier stage's outputs;
+- after a rejection, the engineer's decision and comment.
+
+Each value is labelled with where it comes from:
+- `iterop`: read from the task's provided data, or from the instance when the account may read it;
+- `connector`: what this connector wrote when it started the run and completed each stage. A run-only account often can't read the instance, and a task shows only what its form displays, so this record fills those gaps. On the live engine it is kept in `.private/iterop-runs.json`, so a rejection that comes back days later still has its context after Claude restarts. The record holds the last 50 runs.
+
+The connector never writes the sign-off, so the reviewer's comment is known only when ITEROP shows it. To make it visible, show `engineeringSignoff_decision` and `engineeringSignoff_comment` in the rework task's *Information to display*. Otherwise `runContext.gaps` says the comment is not readable, and Claude asks you for it rather than guessing.
+
 **One setting:** `ITEROP_MCP_REVIEW` alone decides how writes are reviewed. In `step` mode, Claude asks the expert in the chat before each stage. In `final` mode, it runs the automated stages and the result is validated at the ITEROP sign-off. The two write tools are also flagged as writes, so a Claude client may show its own permission prompt depending on its permission mode. That prompt is extra protection, not the review itself. For a strict `step` demo, use Claude's default ("ask") permission mode rather than auto mode.
 
 ## Setup

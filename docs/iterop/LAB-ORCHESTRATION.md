@@ -104,6 +104,8 @@ Import: process list → **Import model** → choose the `.bpmn` file. BPMN carr
 
 Assign the automated tasks and the rework task to the operator identity NOVA will use. Assign the signature tasks to a **different** person. The gateway routes on `engineeringSignoff_decision`. The designer may ask you to re-enter the condition expressions in its own syntax.
 
+**Information to display (rework context).** In the *Rework configuration* task, display `engineeringSignoff_decision` and `engineeringSignoff_comment`. The connector never writes the sign-off, so the reviewer's words reach Claude only if this task shows them, or if the account can read the instance. Otherwise Claude asks the user for them. Displaying the start values and earlier outputs in the later tasks is optional: the connector already records what it wrote for each run.
+
 **Import result on the sandbox (8 October 2026).** Both files import successfully, with non-critical warnings only:
 
 - _"no assignment defined for the task …"_ for every task. Expected: assignments are configured in the designer, not carried by standard BPMN.
