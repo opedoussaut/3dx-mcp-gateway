@@ -65,14 +65,14 @@ The open-source [Cameo MCP Bridge](https://github.com/ajhcs/cameo-mcp-bridge) (M
 | Model receipt | `cameo_model_receipt` reads the model below one element, saves the project and returns the three *Update system model* values. The summary is built from the model's contents, and the values are signed with `CAMEO_RECEIPT_KEY` (HMAC-SHA256). |
 | ITEROP binding | With the same `CAMEO_RECEIPT_KEY`, the ITEROP connector accepts *Update system model* only with a valid signature. Invented or edited values are refused (HTTP 400). |
 
-Tested with a fake plugin in `tests/cameo-guard.test.ts`. Checked read-only against a live CATIA Magic 2024x session with plugin 2.3.5: the plugin is admitted, and the guard refuses because the lab project is not open.
+Tested with a fake plugin in `tests/cameo-guard.test.ts`. Checked read-only against a live CATIA Magic 2024x session (Magic Systems of Systems Architect, UAF template) with plugin 2.3.5: the plugin is admitted, the lab project and package are found, and the model root outside the package is refused. Live findings: search results are compact (no qualified name), so the guard reads candidates in full; the package's qualified name has no `Model::` prefix; UAF stereotype tagged values appear as tree nodes and are left out.
 
 ### Setup
 
-1. In CATIA Magic, create a **new local project** (not on Teamwork Cloud), for example *NOVA Lab Cooling*, and directly under its model a package **NOVA Lab**. Use synthetic content only, and never open a corporate model while the bridge plugin is loaded.
-2. In `.env`:
+1. In CATIA Magic, create a **new local project** (not on Teamwork Cloud), for example *NOVA Lab – Cooling (synthetic)*, and directly under its model a package **NOVA Lab**. Use synthetic content only, and never open a corporate model while the bridge plugin is loaded.
+2. In `.env` (the project name must match exactly, dashes included):
    ```dotenv
-   CAMEO_GUARD_PROJECT=NOVA Lab Cooling
+   CAMEO_GUARD_PROJECT=NOVA Lab – Cooling (synthetic)
    CAMEO_GUARD_PACKAGE=NOVA Lab
    CAMEO_RECEIPT_KEY=<48 random hex characters>
    ```

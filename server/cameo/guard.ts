@@ -194,7 +194,12 @@ export class CameoGuard {
       this.config.scope,
       p.primaryModelName ? `${String(p.primaryModelName)}::${this.config.scope}` : undefined,
     ]);
-    const hits = found.filter((e) => e.id && e.qualifiedName && wanted.has(e.qualifiedName));
+    // Search results are compact (no qualified name): read each candidate in full.
+    const hits: Element[] = [];
+    for (const e of found.filter((x) => x.id).slice(0, 10)) {
+      const full = await this.element(e.id!);
+      if (full.qualifiedName && wanted.has(full.qualifiedName)) hits.push(full);
+    }
     if (hits.length !== 1)
       throw new CameoError(
         404,
@@ -224,22 +229,30 @@ export class CameoGuard {
     }
     throw new CameoError(403, `Element ${elementId} is outside the lab package.`);
   }
-  private async insideList(items: Element[]) {
-    const { scopeQn } = await this.scope();
-    const out: Element[] = [];
-    for (const e of items) {
-      if (!e.id) continue;
-      if (e.qualifiedName?.startsWith(`${scopeQn}::`) || e.id === this.scopeId) out.push(e);
-      else {
-        try {
-          await this.requireInside(e.id);
-          out.push(e);
-        } catch {
-          // Outside the lab package: not shown.
-        }
+  /**
+   * Model elements below one element, from the containment tree. Stereotype tagged values appear
+   * as tree nodes too (for example on UAF packages) and are left out.
+   */
+  private async subtree(rootId: string, depth = 6) {
+    const tree = await this.http.call('GET', '/containment-tree', undefined, { rootId, depth });
+    const nodes = new Map<string, Element>();
+    const walk = (v: unknown) => {
+      if (Array.isArray(v)) v.forEach(walk);
+      else if (v && typeof v === 'object') {
+        const o = v as Element & Json;
+        if (
+          typeof o.id === 'string' &&
+          typeof o.type === 'string' &&
+          o.id !== rootId &&
+          !/TaggedValue$/.test(o.type)
+        )
+          nodes.set(o.id, o);
+        Object.values(o).forEach(walk);
       }
-    }
-    return { elements: out, hidden: items.length - out.length };
+    };
+    walk(tree);
+    for (const id of nodes.keys()) this.inside.add(id);
+    return nodes;
   }
 
   async connection() {
@@ -258,15 +271,19 @@ export class CameoGuard {
     }
   }
   async find(q: { type?: string; name?: string; limit?: number }) {
-    const { scopeQn } = await this.scope();
-    const r = await this.http.call('GET', '/elements', undefined, {
-      type: q.type,
-      name: q.name,
-      package: scopeQn,
-      recursive: 'true',
-      limit: q.limit ?? 50,
-    });
-    return this.insideList((r.elements ?? []) as Element[]);
+    // Searched in the lab package's own containment tree, so nothing outside it is ever read.
+    const { scopeId } = await this.scope();
+    const type = q.type?.toLowerCase();
+    const name = q.name?.toLowerCase();
+    const elements = [...(await this.subtree(scopeId, 10)).values()]
+      .filter(
+        (e) =>
+          (!type || e.type?.toLowerCase() === type || e.humanType?.toLowerCase() === type) &&
+          (!name || e.name?.toLowerCase().includes(name)),
+      )
+      .slice(0, q.limit ?? 50)
+      .map(({ id, name, type, humanType }) => ({ id, name, type, humanType }));
+    return { elements };
   }
   async get(elementId: string) {
     await this.requireInside(elementId);
@@ -385,21 +402,7 @@ export class CameoGuard {
       );
     await this.requireInside(rootId);
     const root = await this.element(rootId);
-    const tree = await this.http.call('GET', '/containment-tree', undefined, {
-      rootId,
-      depth: 6,
-    });
-    const nodes = new Map<string, Element>();
-    const walk = (v: unknown) => {
-      if (Array.isArray(v)) v.forEach(walk);
-      else if (v && typeof v === 'object') {
-        const o = v as Element & Json;
-        if (typeof o.id === 'string' && typeof o.type === 'string' && o.id !== rootId)
-          nodes.set(o.id, o);
-        Object.values(o).forEach(walk);
-      }
-    };
-    walk(tree);
+    const nodes = await this.subtree(rootId);
     const saved = await this.http.call('POST', '/project/save');
     if (saved.saved === false) throw new CameoError(500, 'CATIA Magic did not save the project.');
     const count = new Map<string, number>();
