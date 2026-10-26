@@ -76,7 +76,7 @@ In either mode:
    Follow `nextTask` each time.
 7. When `nextTask` says the run waits for a person, tell the user that **Engineering sign-off** is done by an engineer in ITEROP Play, and give the link.
 8. **Rework:** after a rejection, a **Rework configuration** task appears in `iterop_list_my_tasks` with `rework: true`. Work from its `runContext`, never from memory or guesses:
-   - `signoff` holds the engineer's decision and comment. If it is missing, `gaps` says so: **ask the user what the reviewer asked for**. Never invent or paraphrase a comment you were not given.
+   - `signoff` holds the engineer's decision and comment. On the sandbox the decision is a Boolean shown as Approved/Rejected: use its `meaning` (Approve or Reject), not the raw `true`/`false`. If it is missing, `gaps` says so: **ask the user what the reviewer asked for**. Never invent or paraphrase a comment you were not given.
    - `stages` is the configuration that was rejected; `inputs` the envelope it was designed for. If `gaps` lists missing start values, ask for them.
    - Show the user, briefly: what was rejected, the reviewer's request, and what you will change. Then propose the rework values: revised coolant, redundancy and facility water, plus a `configurationRework_note` saying what changed and why. Follow the review mode.
    - After the rework task, the chain runs again from Select coolant. Its `runContext` now shows the revised `inputs` and `pass: 2`; the earlier pass's outputs carry `fromEarlierPass`. Re-engineer from the revised inputs, re-run `cooling_check`, and present the new proposal next to the rejected one before the four automated tasks run again.

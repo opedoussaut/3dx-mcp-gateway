@@ -52,7 +52,13 @@ This example is the same run as the automated test *"after a rejection the rewor
 
 ## Sandbox setup to receive the reviewer's comment
 
-In the designer, open the *Rework configuration* task and add `engineeringSignoff_decision` and `engineeringSignoff_comment` to its **Information to display**. Redeploy the process. No connector change is needed.
+In Business Process Design, open **Deployment management** (the ▶ icon). The process isn't listed under *Manage your models*. Open *NOVA lab — Liquid cooling configuration chain*, then the form of *Rework configuration*:
+
+1. Use the **link** button (not **+**) to add the existing `engineeringSignoff_decision` and `engineeringSignoff_comment` variables. They are shared with the *Engineering sign-off* task.
+2. Tick **Read-only (only for this task)** on both, and leave **Mandatory** unticked.
+3. Save the form and the model, then deploy.
+
+The tenant names these variables `engineeringReviewerEnginee_engineeringsignoff…`; the connector maps them back to the lab ids by name. The tenant stores the decision as a **Boolean** displayed as *Approved/Rejected*. `runContext` keeps the raw value and adds `meaning`: `true` → Approve, `false` → Reject.
 
 ## Verification
 

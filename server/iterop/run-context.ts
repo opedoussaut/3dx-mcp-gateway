@@ -97,7 +97,14 @@ export class RunJournal {
 }
 
 type Item = { id?: string | null; value?: unknown };
-type Entry = { id: string; name: string; value: unknown; unit?: string; source: Source };
+type Entry = {
+  id: string;
+  name: string;
+  value: unknown;
+  meaning?: string;
+  unit?: string;
+  source: Source;
+};
 type Source = 'iterop' | 'connector';
 
 export function runContext(o: {
@@ -121,10 +128,17 @@ export function runContext(o: {
     const fromTenant = tenant.get(f.id);
     const fromRecord = recorded?.[f.id];
     if (fromTenant === undefined && fromRecord === undefined) return undefined;
+    const value = fromTenant ?? fromRecord;
+    // A two-choice field the tenant models as a Boolean (the sign-off is shown as
+    // "Approved/Rejected"): true is the first choice, false the second.
+    const choices = f.values?.split('##');
+    const meaning =
+      typeof value === 'boolean' && choices?.length === 2 ? choices[value ? 0 : 1] : undefined;
     return {
       id: f.id,
       name: f.name,
-      value: fromTenant ?? fromRecord,
+      value,
+      ...(meaning ? { meaning } : {}),
       ...(f.unit ? { unit: f.unit } : {}),
       source: (fromTenant !== undefined ? 'iterop' : 'connector') as Source,
     };

@@ -401,3 +401,26 @@ test('the run record survives a restart of the connector, and foreign tasks stay
   const res = await call('iterop_get_task', { taskId: signoff.id });
   assert.equal(res.isError, true);
 });
+
+test('a sign-off decision the tenant stores as a Boolean is read as Approve or Reject', async () => {
+  const { runContext } = await import('../server/iterop/run-context');
+  const d = definitions[0];
+  const ctx = runContext({
+    definition: d,
+    taskId: d.rework!.id,
+    iterop: [
+      [
+        { id: 'engineeringSignoff_decision', value: false },
+        { id: 'engineeringSignoff_comment', value: 'Use water.' },
+      ],
+    ],
+  });
+  assert.deepEqual(
+    ctx.signoff?.map((e) => [e.id, e.value, e.meaning]),
+    [
+      ['engineeringSignoff_decision', false, 'Reject'],
+      ['engineeringSignoff_comment', 'Use water.', undefined],
+    ],
+  );
+  assert.ok(!ctx.gaps.some((g) => /decision and comment/.test(g)));
+});
