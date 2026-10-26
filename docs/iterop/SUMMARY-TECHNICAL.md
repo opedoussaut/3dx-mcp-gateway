@@ -1,6 +1,6 @@
 # Claude ⇄ ITEROP: technical summary
 
-*Status as of 8 October 2026. Repository `opedoussaut/3dx-mcp-gateway`, branches `claude-iterop-orchestrator` (direct connector) and `claude/iterop-orchestration-lab` (NOVA lab).*
+*Status as of 26 October 2026 (rework context added; the rest unchanged since 8 October). Repository `opedoussaut/3dx-mcp-gateway`, branches `claude-iterop-orchestrator` (direct connector) and `claude/iterop-orchestration-lab` (NOVA lab).*
 
 ## 1. Scope
 
