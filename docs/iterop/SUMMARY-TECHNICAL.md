@@ -153,6 +153,8 @@ The output is PASS, REVIEW or FAIL with findings, plus `checkTaskValues`. The co
 ## 9. Open items
 
 1. A complete live run through the direct connector, including Claude's design, the automated stages, the sign-off, and a rejection followed by rework.
-2. Rework context is implemented: `runContext` combines ITEROP data with the connector's own run record. Still to do on the sandbox: display the sign-off decision and comment in the rework task's "Information to display", then verify it in a live rejection.
+2. Rework context is implemented: `runContext` combines ITEROP data with the connector's own run record.
+   - **Verified live** on 26 October (`COOL-261026-175446`): after a rejection in Play, the rework task returned the run's inputs and the rejected stages from the connector's record, and named the missing sign-off as a gap.
+   - **Still open:** the engineer's comment does not reach the API. Linking the sign-off variables into the rework *form* returns them as empty `expectedFields`. Next to try is a task-level "Information to display" setting (see `REWORK-CONTEXT.md`).
 3. Production path: agree the route, account and roles with the platform owner, a security review, real engineering rules instead of `LIMITS`, and a decision on whether step-mode confirmation must be enforceable outside the chat (for example, approval in the NOVA page).
 4. A hosted or multi-user version, which needs a deliberate authentication, storage and network design. The current runtime is single-operator and local.

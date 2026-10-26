@@ -48,15 +48,15 @@ This example is the same run as the automated test *"after a rejection the rewor
    - Claude redesigns with water and 6 × CDU-500 (2N, 80 % utilisation), about 1,727 L/min in total and 108 L/min per rack.
    - It re-checks, shows the new design next to the rejected one, completes the four stages, and the run goes back to the engineer.
 
-**On the live sandbox today**, the run is not readable by the robot account and the rework task does not yet display the sign-off fields. In step 4, the inputs and stages therefore come from the connector's record, there is no `signoff`, and `gaps` says the decision and comment cannot be read. Claude asks the user what the reviewer asked for.
+**On the live sandbox today**, the robot account cannot read the run, and the API does not return the sign-off values (see *Live result*). In step 4, the inputs and stages therefore come from the connector's record, there is no `signoff`, and `gaps` says the decision and comment cannot be read. Claude asks the user what the reviewer asked for.
 
 ## Sandbox setup to receive the reviewer's comment
 
-In Business Process Design, open **Deployment management** (the ▶ icon). The process isn't listed under *Manage your models*. Open *NOVA lab — Liquid cooling configuration chain*, then the form of *Rework configuration*:
+In Business Process Design, the deployed process is under **Deployment management** (the ▶ icon), not under *Manage your models*.
 
-1. Use the **link** button (not **+**) to add the existing `engineeringSignoff_decision` and `engineeringSignoff_comment` variables. They are shared with the *Engineering sign-off* task.
-2. Tick **Read-only (only for this task)** on both, and leave **Mandatory** unticked.
-3. Save the form and the model, then deploy.
+**Tried, not sufficient (version 2, 26 October 2026).** In the form of *Rework configuration*, the existing `engineeringSignoff_decision` and `engineeringSignoff_comment` variables were linked (the **link** button, not **+**) and set to read-only. Play then shows the engineer's answer in the task. The API does not: `getTaskInstanceInformations` returns the two variables as **empty form fields** in `expectedFields` (no value), and `providedData` stays empty.
+
+**Next to try:** a task-level **Information to display** setting, separate from the form editor. Values shown there should arrive in `providedData`. This has not been found or verified yet. Once it works, the two linked form fields can be removed again.
 
 The tenant names these variables `engineeringReviewerEnginee_engineeringsignoff…`; the connector maps them back to the lab ids by name. The tenant stores the decision as a **Boolean** displayed as *Approved/Rejected*. `runContext` keeps the raw value and adds `meaning`: `true` → Approve, `false` → Reject.
 
@@ -68,4 +68,18 @@ Covered by `tests/iterop-direct.test.ts`:
 - the record surviving a restart of the connector;
 - foreign tasks staying unreadable through `iterop_get_task`.
 
-A live rejection on the sandbox has not been run yet.
+## Live result (sandbox, 26 October 2026)
+
+Run `COOL-261026-175446` was started and driven by Claude Desktop through the connector, then rejected by the engineer in ITEROP Play. `iterop_get_task` on the open *Rework configuration* task, read-only, returned:
+- `rework: true` in `iterop_list_my_tasks`;
+- all five start values and all four rejected stages, labelled `connector`, `pass: 1`;
+- no `signoff`, and two gaps:
+  - `getInstanceInfo` 403;
+  - the decision and comment not readable.
+
+**Verified live:** the connector's run record, the source labels, and the refusal to guess.
+
+**Not yet verified live:**
+- the sign-off reaching Claude through ITEROP (see the setup section);
+- the Boolean `meaning` on real data;
+- the second pass after the rework.
