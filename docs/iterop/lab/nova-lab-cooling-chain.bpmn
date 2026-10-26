@@ -25,6 +25,7 @@
         <bpmn:flowNodeRef>cduSizing</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>loopConfiguration</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>systemCheck</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>systemModel</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>configurationRework</bpmn:flowNodeRef>
       </bpmn:lane>
       <bpmn:lane id="Lane_reviewer" name="Engineering reviewer">
@@ -55,11 +56,16 @@
     <bpmn:userTask id="systemCheck" name="Check system limits">
       <bpmn:documentation>Output variables: systemCheck_result (SELECT PASS##REVIEW##FAIL), systemCheck_findings (TEXT_AREA). Assigned to the operator.</bpmn:documentation>
       <bpmn:incoming>Flow_loop_check</bpmn:incoming>
-      <bpmn:outgoing>Flow_check_signoff</bpmn:outgoing>
+      <bpmn:outgoing>Flow_check_model</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="systemModel" name="Update system model">
+      <bpmn:documentation>Output variables: systemModel_reference (TEXT), systemModel_revision (TEXT), systemModel_summary (TEXT_AREA). Assigned to the operator. Records the system model (SysML) revision that describes the checked configuration.</bpmn:documentation>
+      <bpmn:incoming>Flow_check_model</bpmn:incoming>
+      <bpmn:outgoing>Flow_model_signoff</bpmn:outgoing>
     </bpmn:userTask>
     <bpmn:userTask id="engineeringSignoff" name="Engineering sign-off">
       <bpmn:documentation>Signature task, human only. Output variables: engineeringSignoff_decision (SELECT Approve##Reject), engineeringSignoff_comment (TEXT_AREA, optional). Assign to a reviewer who is not the operator; enable signature.</bpmn:documentation>
-      <bpmn:incoming>Flow_check_signoff</bpmn:incoming>
+      <bpmn:incoming>Flow_model_signoff</bpmn:incoming>
       <bpmn:outgoing>Flow_signoff_decision</bpmn:outgoing>
     </bpmn:userTask>
     <bpmn:exclusiveGateway id="signoffDecision" name="Decision?">
@@ -79,7 +85,8 @@
     <bpmn:sequenceFlow id="Flow_coolant_cdu" sourceRef="coolantSelection" targetRef="cduSizing" />
     <bpmn:sequenceFlow id="Flow_cdu_loop" sourceRef="cduSizing" targetRef="loopConfiguration" />
     <bpmn:sequenceFlow id="Flow_loop_check" sourceRef="loopConfiguration" targetRef="systemCheck" />
-    <bpmn:sequenceFlow id="Flow_check_signoff" sourceRef="systemCheck" targetRef="engineeringSignoff" />
+    <bpmn:sequenceFlow id="Flow_check_model" sourceRef="systemCheck" targetRef="systemModel" />
+    <bpmn:sequenceFlow id="Flow_model_signoff" sourceRef="systemModel" targetRef="engineeringSignoff" />
     <bpmn:sequenceFlow id="Flow_signoff_decision" sourceRef="engineeringSignoff" targetRef="signoffDecision" />
     <bpmn:sequenceFlow id="Flow_approve" name="Approve" sourceRef="signoffDecision" targetRef="approved">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">engineeringSignoff_decision == 'Approve'</bpmn:conditionExpression>
@@ -116,6 +123,9 @@
       <bpmndi:BPMNShape id="systemCheck_di" bpmnElement="systemCheck">
         <dc:Bounds x="760" y="140" width="120" height="80" />
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="systemModel_di" bpmnElement="systemModel">
+        <dc:Bounds x="905" y="140" width="120" height="80" />
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="configurationRework_di" bpmnElement="configurationRework">
         <dc:Bounds x="1050" y="140" width="120" height="80" />
       </bpmndi:BPMNShape>
@@ -142,8 +152,11 @@
       <bpmndi:BPMNEdge id="Flow_loop_check_di" bpmnElement="Flow_loop_check">
         <di:waypoint x="720" y="180" /><di:waypoint x="760" y="180" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_check_signoff_di" bpmnElement="Flow_check_signoff">
-        <di:waypoint x="880" y="180" /><di:waypoint x="980" y="180" /><di:waypoint x="980" y="340" />
+      <bpmndi:BPMNEdge id="Flow_check_model_di" bpmnElement="Flow_check_model">
+        <di:waypoint x="880" y="180" /><di:waypoint x="905" y="180" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_model_signoff_di" bpmnElement="Flow_model_signoff">
+        <di:waypoint x="965" y="220" /><di:waypoint x="965" y="340" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_signoff_decision_di" bpmnElement="Flow_signoff_decision">
         <di:waypoint x="1040" y="380" /><di:waypoint x="1090" y="380" />

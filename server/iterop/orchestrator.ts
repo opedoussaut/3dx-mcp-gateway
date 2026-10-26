@@ -1086,12 +1086,14 @@ const toolTitle: Record<string, string> = {
   cdu: 'Run the unit sizing tool',
   loop: 'Run the loop calculator',
   validator: 'Run the system limit check',
+  model: 'Record the system model (synthetic placeholder)',
 };
 function runTool(tool: string, c: Ctx): Fields {
   const i = c.inputs!;
   if (tool === 'coolant') return tools.coolant(i);
   if (tool === 'cdu') return tools.cdu(i);
   if (tool === 'loop') return tools.loop(i, c.outputs);
+  if (tool === 'model') return tools.model(c.identificator, c.outputs, c.outputs);
   return tools.validator(i, c.outputs, c.outputs);
 }
 function noteFor(tool: string, f: Fields) {
@@ -1100,6 +1102,7 @@ function noteFor(tool: string, f: Fields) {
     return `${f.cduSizing_units} × ${f.cduSizing_model} (${f.cduSizing_dutyUnits} duty)`;
   if (tool === 'loop')
     return `${f.loopConfiguration_supplyC} → ${f.loopConfiguration_returnC} °C · ${f.loopConfiguration_rackFlowLpm} L/min/rack`;
+  if (tool === 'model') return String(f.systemModel_reference);
   return String(f.systemCheck_result);
 }
 function outputsOf(def: ProcessDefinition, out: Fields) {

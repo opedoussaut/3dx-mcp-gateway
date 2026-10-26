@@ -42,7 +42,7 @@ test('live engine drives the lab chain through the gateway with key, agent, then
     assert.equal(c.headers.Cookie, 'GWSESSION=abc');
   }
   const writes = gw.calls.filter((c) => c.method === 'POST');
-  assert.equal(writes.length, 5);
+  assert.equal(writes.length, 6);
   assert.equal(
     writes[0].url.pathname,
     '/api/businessprocess/v2/runtime/processes/tenantCoolingChain',

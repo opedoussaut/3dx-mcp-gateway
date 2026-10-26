@@ -19,6 +19,7 @@ import {
   UserCheck,
   Waypoints,
   X,
+  Boxes,
 } from 'lucide-react';
 import type { OrchestrationRun, OrchestrationStage, OrchestrationStep } from '../shared/types';
 import { api } from './api';
@@ -103,6 +104,7 @@ const stageIcon: Record<string, typeof Cpu> = {
   cduSizing: Cpu,
   loopConfiguration: Waypoints,
   systemCheck: Gauge,
+  systemModel: Boxes,
   engineeringSignoff: Stamp,
   requirementReview: Stamp,
 };

@@ -44,6 +44,8 @@ Each value is labelled with where it comes from:
 
 The connector never writes the sign-off, so the reviewer's comment is known only when ITEROP shows it. To make it visible, show `engineeringSignoff_decision` and `engineeringSignoff_comment` in the rework task's *Information to display*. Otherwise `runContext.gaps` says the comment is not readable, and Claude asks you for it rather than guessing. The diagram and a worked example are in [REWORK-CONTEXT.md](REWORK-CONTEXT.md).
 
+**System model step.** The cooling chain now has an *Update system model* task between the check and the sign-off. It records the system model (SysML) revision for the configuration. See [SYSTEM-MODEL.md](SYSTEM-MODEL.md).
+
 **One setting:** `ITEROP_MCP_REVIEW` alone decides how writes are reviewed. In `step` mode, Claude asks the expert in the chat before each stage. In `final` mode, it runs the automated stages and the result is validated at the ITEROP sign-off. The two write tools are also flagged as writes, so a Claude client may show its own permission prompt depending on its permission mode. That prompt is extra protection, not the review itself. For a strict `step` demo, use Claude's default ("ask") permission mode rather than auto mode.
 
 ## Setup

@@ -73,6 +73,14 @@ async function runAutomated(
     ['Size coolant distribution units', pick(p, 'cduSizing_')],
     ['Configure secondary loop', pick(p, 'loopConfiguration_')],
     ['Check system limits', check.checkTaskValues],
+    [
+      'Update system model',
+      {
+        systemModel_reference: 'SYNTHETIC/CoolingSystem',
+        systemModel_revision: 'synthetic, no model created',
+        systemModel_summary: `Placeholder: ${p.cduSizing_units} × ${p.cduSizing_model}, ${p.loopConfiguration_flowLpm} L/min.`,
+      },
+    ],
   ];
   let taskId = firstTaskId;
   let last: { nextTask?: unknown } = {};

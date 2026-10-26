@@ -75,6 +75,11 @@ async function driveChain(call: Awaited<ReturnType<typeof connect>>['call']) {
     'Size coolant distribution units': pick('cduSizing_'),
     'Configure secondary loop': pick('loopConfiguration_'),
     'Check system limits': check.checkTaskValues,
+    'Update system model': {
+      systemModel_reference: 'LAB-PROJECT/CoolingSystem',
+      systemModel_revision: 'r1',
+      systemModel_summary: 'Cooling system block, CDUs and secondary loop with flow ports.',
+    },
   };
   let next = started.nextTask;
   for (const name of Object.keys(values)) {
@@ -167,7 +172,7 @@ test('through the API Gateway: foreign tasks and processes hidden, signature ref
   const { started } = await driveChain(call);
   assert.match(started.openInIterop, /^https:\/\/play\.example\.test\/play\/monitoring\//);
   const writes = gw.calls.filter((c) => c.method === 'POST');
-  assert.equal(writes.length, 5);
+  assert.equal(writes.length, 6);
   assert.ok(writes.every((w) => !('user' in (w.body as object))));
   const mine = await call('iterop_list_my_tasks');
   assert.equal(mine.otherTasksHidden, 1);
@@ -312,6 +317,7 @@ test('after a rejection the rework task carries the run: inputs, each stage, the
       'Size coolant distribution units',
       'Configure secondary loop',
       'Check system limits',
+      'Update system model',
     ],
   );
   assert.equal(valueOf(ctx.stages[0].values, 'coolantSelection_fluid'), 'PG25');
@@ -368,7 +374,7 @@ test('when ITEROP shows little, the context falls back on what the connector wro
   assert.ok(
     [...ctx.inputs, ...ctx.stages.flatMap((s) => s.values)].every((e) => e.source === 'connector'),
   );
-  assert.equal(ctx.stages.length, 4);
+  assert.equal(ctx.stages.length, 5);
   assert.equal(ctx.signoff, undefined);
   assert.ok(ctx.gaps.some((g) => /getInstanceInfo 403/.test(g)));
   assert.ok(ctx.gaps.some((g) => /decision and comment .* not readable/.test(g)));

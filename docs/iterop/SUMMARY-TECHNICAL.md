@@ -6,7 +6,7 @@
 
 The aim is natural-language read and drive of ITEROP Business Process API v2 (R2026x-FD04) processes from Claude.
 - **Processes:** two synthetic BPMN models imported into a sandbox tenant:
-  - `syn-cooling-chain`: operating envelope → select coolant → size coolant distribution units → configure secondary loop → check system limits → engineering sign-off, with a rework loop;
+  - `syn-cooling-chain`: operating envelope → select coolant → size coolant distribution units → configure secondary loop → check system limits → update system model → engineering sign-off, with a rework loop. *Update system model* is in the code and the BPMN file since 26 October 2026; the sandbox deployment (version 2) does not have it yet;
   - `syn-requirement-intake`.
 - **Operations used:** `getAllStartableProcesses`, `getBasicProcessInfo`, `getProcessInfo`, `getTasksByUser`, `getTaskInstanceInformations`, `getInstanceInfo`, `startProcess`, `completeTask`.
 - **Never implemented:** assignments, stop, deploy, import, delete, rights, `completeTaskAsWebHook`.

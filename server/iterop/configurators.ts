@@ -84,6 +84,18 @@ export function loop(input: ChainInputs, fluid: Fields): Fields {
   };
 }
 
+/**
+ * SYNTHETIC stand-in for the system modelling step: no model is created. It returns a labelled
+ * placeholder reference so the lab can run the chain before a modelling connector is wired in.
+ */
+export function model(identificator: string | undefined, unit: Fields, loopFields: Fields): Fields {
+  return {
+    systemModel_reference: `SYNTHETIC/${identificator ?? 'run'}/CoolingSystem`,
+    systemModel_revision: 'synthetic, no model created',
+    systemModel_summary: `Placeholder for the system model: ${unit.cduSizing_units} × ${unit.cduSizing_model}, secondary loop ${loopFields.loopConfiguration_supplyC} → ${loopFields.loopConfiguration_returnC} °C, ${loopFields.loopConfiguration_flowLpm} L/min.`,
+  };
+}
+
 export function validator(input: ChainInputs, unit: Fields, loopFields: Fields): Fields {
   const findings: string[] = [];
   let result: 'PASS' | 'REVIEW' | 'FAIL' = 'PASS';

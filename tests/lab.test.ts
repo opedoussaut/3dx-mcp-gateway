@@ -139,7 +139,14 @@ test('the cooling chain runs end to end, then hands off to the human reviewer', 
   const writes = run.steps.filter((s) => s.kind === 'drive');
   assert.deepEqual(
     writes.map((s) => s.operationId),
-    ['startProcess', 'completeTask', 'completeTask', 'completeTask', 'completeTask'],
+    [
+      'startProcess',
+      'completeTask',
+      'completeTask',
+      'completeTask',
+      'completeTask',
+      'completeTask',
+    ],
   );
   assert.ok(writes.every((s) => s.status === 'done'));
   assert.equal(run.steps.at(-1)!.kind, 'human');
@@ -439,7 +446,7 @@ test('a stopped run is continued from the task it waits at, with the values alre
   const completes = resumed.steps.filter(
     (s) => s.operationId === 'completeTask' && s.status === 'done',
   );
-  assert.equal(completes.length, 3);
+  assert.equal(completes.length, 4);
   const none = await o.start('Continue COOL-001', 'all');
   assert.equal(none.status, 'completed');
   assert.match(none.summary, /no open task/);

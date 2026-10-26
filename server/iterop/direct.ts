@@ -192,7 +192,9 @@ export function registerDirectTools(server: McpServer, o: DirectOptions) {
             proposedBy: t.tool
               ? t.tool === 'validator'
                 ? 'cooling_check (independent check)'
-                : 'you (Claude), then verified with cooling_check'
+                : t.tool === 'model'
+                  ? 'the system modelling tool (for example a Cameo bridge MCP): the reference and revision of the model you created or updated. Never invent them; without such a tool, ask the user.'
+                  : 'you (Claude), then verified with cooling_check'
               : undefined,
             rework: 'rework' in t ? true : undefined,
             fields: t.expectedFields.map(field),

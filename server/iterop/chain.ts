@@ -19,7 +19,7 @@ export type VariableDefinition = {
   max?: string;
   unit?: string;
 };
-export type ToolName = 'coolant' | 'cdu' | 'loop' | 'validator';
+export type ToolName = 'coolant' | 'cdu' | 'loop' | 'validator' | 'model';
 export type TaskDefinition = {
   id: string;
   name: string;
@@ -156,6 +156,25 @@ export const definitions: readonly ProcessDefinition[] = [
             values: 'PASS##REVIEW##FAIL',
           }),
           v('systemCheck_findings', 'Findings', 'TEXT_AREA', 'What the check found.'),
+        ],
+      },
+      {
+        id: 'systemModel',
+        name: 'Update system model',
+        description:
+          'Record the system model (SysML) revision that describes the checked configuration.',
+        priority: 2,
+        assignee: 'self',
+        tool: 'model',
+        expectedFields: [
+          v(
+            'systemModel_reference',
+            'Model reference',
+            'TEXT',
+            'Project and element of the system model, for example the cooling system block.',
+          ),
+          v('systemModel_revision', 'Model revision', 'TEXT', 'Revision or commit holding it.'),
+          v('systemModel_summary', 'Model changes', 'TEXT_AREA', 'What was created or updated.'),
         ],
       },
       {
