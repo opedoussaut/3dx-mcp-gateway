@@ -22,6 +22,8 @@ process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 if (existsSync('.env')) process.loadEnvFile('.env');
 
 const review = process.env.ITEROP_MCP_REVIEW === 'final' ? 'final' : 'step';
+// Set together with the guarded Cameo connector; "Update system model" then needs its receipt.
+const modelReceiptKey = process.env.CAMEO_RECEIPT_KEY?.trim() || undefined;
 const server = new McpServer({ name: 'claude-iterop-orchestrator', version: '0.1.0' });
 if (process.env.ITEROP_MCP_ENGINE === 'live') {
   const config = loadLabLiveConfig();
@@ -36,12 +38,14 @@ if (process.env.ITEROP_MCP_ENGINE === 'live') {
     review,
     // Live runs outlive this process (a sign-off may come days later): keep the record locally.
     journal: new RunJournal('.private/iterop-runs.json'),
+    modelReceiptKey,
   });
 } else {
   registerDirectTools(server, {
     engine: new SyntheticEngine(),
     processes: definitions.map((d) => d.key),
     review,
+    modelReceiptKey,
   });
 }
 await server.connect(new StdioServerTransport());

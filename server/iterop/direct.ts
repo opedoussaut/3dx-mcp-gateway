@@ -4,6 +4,7 @@ import { definition, definitions, sameTask, type ProcessDefinition } from './cha
 import { LIMITS } from './configurators';
 import { checkProposal, type Envelope, type Proposal } from './proposal-check';
 import { RunJournal, runContext } from './run-context';
+import { verifyReceipt } from '../cameo/receipt';
 import { EngineError, type ProcessEngine } from './simulator';
 
 /**
@@ -41,6 +42,11 @@ export type DirectOptions = {
   review?: 'step' | 'final';
   /** What this connector wrote per run, for the run context of later tasks. In memory by default. */
   journal?: RunJournal;
+  /**
+   * Shared with the guarded Cameo connector (CAMEO_RECEIPT_KEY). When set, "Update system model"
+   * accepts only a model receipt signed by that connector.
+   */
+  modelReceiptKey?: string;
   now?: () => Date;
 };
 
@@ -408,6 +414,16 @@ export function registerDirectTools(server: McpServer, o: DirectOptions) {
           throw new EngineError(
             400,
             '“Check system limits” accepts only the checkTaskValues returned by cooling_check for the proposal you used.',
+          );
+        // The model reference must come from the modelling connector, not from Claude.
+        if (
+          o.modelReceiptKey &&
+          taskDefinition(d, task.name)?.id === 'systemModel' &&
+          !verifyReceipt(o.modelReceiptKey, values)
+        )
+          throw new EngineError(
+            400,
+            '“Update system model” accepts only the signed values returned by cameo_model_receipt, unchanged.',
           );
         await o.engine.completeTask(taskId, { data: values });
         journal.completed(

@@ -84,12 +84,18 @@ In either mode:
    - Values marked `connector` are what this connector wrote; if a person changed the run in ITEROP Play since, ITEROP may differ. Mention it when it matters.
 
 **Update system model.** This task records which system model (SysML) revision describes the checked configuration. Its fields are `systemModel_reference`, `systemModel_revision` and `systemModel_summary`.
-- If a system modelling tool is connected (for example a Cameo bridge MCP), create or update the model there first, then write the reference and revision that tool returns. A typical model has:
+- If the guarded CATIA Magic connector is connected (`cameo_*` tools):
+  1. Call `cameo_connection`. It must report `ready: true`, with the lab project and the lab package id.
+  2. Build or update the model **inside the lab package**: `cameo_create_element`, `cameo_create_relationship`, `cameo_set_specification` / `cameo_set_tagged_values`, then `cameo_create_diagram`, `cameo_add_to_diagram`, `cameo_layout_diagram`. Writes outside the lab package are refused.
+  3. Call `cameo_model_receipt` on the cooling system block. It saves the project and returns the three task values, signed. Write them to *Update system model* **unchanged**: the ITEROP connector rejects invented or edited values.
+  4. If `cameo_connection` is not ready, tell the user what it says (for example "open the lab project") and stop before this task.
+- A typical model has:
   - a cooling system block with the CDUs, the secondary loop and the racks as parts;
   - flow ports carrying coolant flow and temperatures;
   - requirements (supply ≤ 40 °C, ≤ 150 L/min per rack) with *satisfy* links;
   - an energy-balance constraint Q = ρ·cp·V̇·ΔT.
-- **Never invent a model reference or revision.** If no modelling tool is connected, say so and ask the user for the reference and revision. If there is no model yet, ask whether to record exactly that (for example "NOT MODELLED").
+- **Never invent a model reference or revision.** If no modelling tool is connected, say so and ask the user. When receipts are on, only `cameo_model_receipt` output is accepted.
+- Never use or ask for the Cameo MCP Bridge's own tools (macros, deletes): only the guarded `cameo_*` tools listed here.
 - In `step` mode, show the model changes before writing the task.
 - After a rework, update the same model; the earlier reference is in `runContext.stages`.
 
