@@ -52,6 +52,14 @@ createServer((req, res) => {
     return;
   }
   res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-store' }).end(body);
-}).listen(Number(port), '127.0.0.1', () =>
-  console.log(`OpenUSD viewer on http://127.0.0.1:${port}\nScene: ${scene}`),
-);
+})
+  .on('error', (e: NodeJS.ErrnoException) => {
+    if (e.code !== 'EADDRINUSE') throw e;
+    console.error(
+      `Port ${port} is already in use, probably by another viewer. Open http://127.0.0.1:${port}, stop the other one, or choose a port: npm run twin:view -- "${scene}" 8766`,
+    );
+    process.exit(1);
+  })
+  .listen(Number(port), '127.0.0.1', () =>
+    console.log(`OpenUSD viewer on http://127.0.0.1:${port}\nScene: ${scene}`),
+  );
