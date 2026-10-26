@@ -15,6 +15,7 @@
     "lab:probe": "node --import tsx scripts/lab-probe.ts",
     "iterop:mcp": "node --import tsx server/iterop-mcp.ts",
     "cameo:mcp": "node --import tsx server/cameo-mcp.ts",
+    "twin:usd": "node --import tsx scripts/twin/cooling-usd.ts",
     "demo:run": "node --import tsx scripts/demo/direct-run.ts .private/demo-run.json",
     "demo:record": "node scripts/demo/record.mjs .private/demo-run.json .private/demo-video"
   },
