@@ -5,22 +5,31 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NOVA · OpenUSD viewer</title>
 <style>
-  :root { --ink: #10283f; --muted: #566a7c; --line: #d6e1e9; --panel: rgba(255,255,255,.92); }
+  :root { --ink: #10283f; --muted: #566a7c; --line: #d6e1e9; --panel: rgba(255,255,255,.93); --blue: #1768a4; }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: #e9eef2; color: var(--ink); font: 14px/1.45 "Segoe UI", system-ui, sans-serif; }
   #view { position: fixed; inset: 0; }
   .panel { position: fixed; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
-  #info { top: 16px; left: 16px; max-width: 340px; }
-  #info h1 { font-size: 15px; margin: 0 0 4px; }
+  #info { top: 16px; left: 16px; max-width: 380px; display: grid; gap: 6px; }
+  #info h1 { font-size: 15px; margin: 0; }
   #info p { margin: 0; color: var(--muted); font-size: 13px; }
+  .check { font-size: 13px; padding: 6px 8px; border-radius: 8px; }
+  .check.pass { background: #e3f3f2; color: #0b6a6e; }
+  .check.fail { background: #fbe6e3; color: #a32d22; font-weight: 600; }
+  #changes { margin: 0; padding-left: 18px; font-size: 13px; }
+  #modes { bottom: 16px; left: 50%; transform: translateX(-50%); display: none; gap: 4px; padding: 4px; }
+  #modes button { border: 0; background: transparent; padding: 7px 14px; border-radius: 8px; font: inherit; color: var(--ink); cursor: pointer; }
+  #modes button[aria-pressed="true"] { background: var(--blue); color: #fff; }
+  #modes button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
   #legend { bottom: 16px; left: 16px; display: grid; gap: 6px; font-size: 13px; }
   #legend span { display: inline-flex; align-items: center; gap: 8px; }
   #legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
-  #pick { top: 16px; right: 16px; width: 300px; display: none; }
+  #pick { top: 64px; right: 16px; width: 300px; display: none; }
   #pick h2 { font-size: 14px; margin: 0 0 6px; }
   #pick dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 13px; }
   #pick dt { color: var(--muted); }
-  #status { bottom: 16px; right: 16px; font-size: 12px; color: var(--muted); }
+  #pick dd { margin: 0; overflow-wrap: anywhere; }
+  #status { top: 16px; right: 16px; max-width: 300px; font-size: 12px; color: var(--muted); }
 </style>
 <script type="importmap">
 { "imports": {
@@ -34,15 +43,15 @@
 <div id="info" class="panel">
   <h1 id="title">OpenUSD scene</h1>
   <p id="sub">Drag to orbit · scroll to zoom · right-drag to pan · click a part.</p>
+  <div id="space" class="check" hidden></div>
+  <ul id="changes" hidden></ul>
 </div>
-<div id="legend" class="panel" aria-label="Legend">
-  <span><i style="background:#1f2124"></i>Racks</span>
-  <span><i style="background:#0b6b6e"></i>CDU, duty</span>
-  <span><i style="background:#739a9e"></i>CDU, standby</span>
-  <span><i style="background:#1768a4"></i>Secondary supply</span>
-  <span><i style="background:#c7332a"></i>Secondary return</span>
-  <span><i style="background:#338c40"></i>Facility water</span>
+<div id="modes" class="panel" role="group" aria-label="View">
+  <button type="button" data-mode="proposed" aria-pressed="true">Proposed</button>
+  <button type="button" data-mode="baseline" aria-pressed="false">Baseline</button>
+  <button type="button" data-mode="compare" aria-pressed="false">Compare</button>
 </div>
+<div id="legend" class="panel" aria-label="Legend"></div>
 <div id="pick" class="panel" aria-live="polite"><h2 id="pickName"></h2><dl id="pickAttrs"></dl></div>
 <div id="status" class="panel">Loading…</div>
 
@@ -51,28 +60,32 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { USDLoader } from 'three/addons/loaders/USDLoader.js';
 
-const status = document.getElementById('status');
-const params = new URLSearchParams(location.search);
-const url = params.get('file') || 'scene.usda';
+const $ = (id) => document.getElementById(id);
+const LEGEND = {
+  normal: [['#1f2124', 'Racks'], ['#0b6b6e', 'CDU, duty'], ['#739a9e', 'CDU, standby'], ['#d93a2b', 'CDU outside the gallery'], ['#f2c14e', 'CDU gallery'], ['#1768a4', 'Secondary supply'], ['#c7332a', 'Secondary return'], ['#338c40', 'Facility water']],
+  compare: [['#2fbf71', 'Added'], ['#f0a020', 'Changed or moved'], ['#e04040', 'Removed (baseline)'], ['#b8c2cb', 'Unchanged']],
+};
+const legend = (kind) => $('legend').replaceChildren(...LEGEND[kind].map(([c, t]) => {
+  const s = document.createElement('span'); const i = document.createElement('i');
+  i.style.background = c; s.append(i, t); return s;
+}));
+legend('normal');
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.setSize(innerWidth, innerHeight);
-document.getElementById('view').appendChild(renderer.domElement);
-
+$('view').appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xe9eef2);
-const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.05, 500);
+const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 500);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 scene.add(new THREE.HemisphereLight(0xffffff, 0x8a96a3, 1.6));
 const sun = new THREE.DirectionalLight(0xffffff, 1.6);
-sun.position.set(6, -8, 12);
+sun.position.set(6, 12, 8);
 scene.add(sun);
 
-/** The scene's own attributes, read from the text so the viewer can show nova: values. */
-async function readAttributes() {
-  const text = await (await fetch(url)).text();
+/** nova: attributes and stage metadata, read from the text, keyed by prim path. */
+function parse(text) {
   const attrs = new Map();
   const stack = [];
   let pending = null;
@@ -83,71 +96,174 @@ async function readAttributes() {
     if (/^\s*\}\s*$/.test(line)) stack.pop();
     const a = line.match(/custom \w+ nova:(\w+) = (.+)$/);
     if (a && stack.length) {
-      const name = stack[stack.length - 1];
-      if (!attrs.has(name)) attrs.set(name, {});
-      attrs.get(name)[a[1]] = a[2].replace(/^"|"$/g, '');
+      const key = stack.join('/');
+      if (!attrs.has(key)) attrs.set(key, {});
+      attrs.get(key)[a[1]] = a[2].replace(/^"|"$/g, '');
     }
   }
-  const up = (text.match(/upAxis = "(\w)"/) || [])[1] || 'Y';
-  const doc = (text.match(/doc = "([^"]*)"/) || [])[1];
-  return { attrs, up, doc };
+  return {
+    attrs,
+    up: (text.match(/upAxis = "(\w)"/) || [])[1] || 'Y',
+    doc: (text.match(/doc = "([^"]*)"/) || [])[1],
+  };
 }
-
-try {
-  const [{ attrs, up, doc }, model] = await Promise.all([readAttributes(), new USDLoader().loadAsync(url)]);
-  // three.js is Y-up; rotate a Z-up stage so the floor lies flat.
-  if (up === 'Z') model.rotation.x = -Math.PI / 2;
-  scene.add(model);
+/** Prim path of an object below the loaded model, e.g. CoolingSystem/CoolantDistributionUnits/CDU_1. */
+const pathOf = (o, root) => {
+  const names = [];
+  for (let p = o; p && p !== root; p = p.parent) if (p.name) names.push(p.name);
+  return names.reverse().join('/');
+};
+const attrsOf = (meta, path) => {
+  for (const [k, v] of meta.attrs) if (k === path || k.endsWith(`/${path}`) || path.endsWith(`/${k}`)) return v;
+  return {};
+};
+async function load(url) {
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) return null;
+  const text = await res.text();
+  const meta = parse(text);
+  const model = await new USDLoader().loadAsync(url);
+  if (meta.up === 'Z') model.rotation.x = -Math.PI / 2;
   model.updateMatrixWorld(true);
-
-  let meshes = 0;
-  model.traverse((o) => { if (o.isMesh) meshes++; });
-  const box = new THREE.Box3().setFromObject(model);
-  const centre = box.getCenter(new THREE.Vector3());
-  const size = box.getSize(new THREE.Vector3()).length();
-  camera.position.copy(centre).add(new THREE.Vector3(0.75, 0.6, 0.9).normalize().multiplyScalar(size * 1.05));
-  controls.target.copy(centre);
-  controls.update();
-
-  const root = attrs.get('CoolingSystem') || {};
-  document.getElementById('title').textContent = root.coolant
-    ? `Liquid cooling · ${Number(root.itLoadKw) / 1000} MW · ${root.coolant}`
-    : 'OpenUSD scene';
-  if (doc) document.getElementById('sub').textContent = doc;
-  status.textContent = `${url} · ${meshes} meshes · ${up}-up`;
-
-  // Click a part: show its name and its nova: attributes (and those of its group).
-  const ray = new THREE.Raycaster();
-  const ndc = new THREE.Vector2();
-  const pick = document.getElementById('pick');
-  let highlighted = null;
-  renderer.domElement.addEventListener('click', (e) => {
-    ndc.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
-    ray.setFromCamera(ndc, camera);
-    const hit = ray.intersectObject(model, true).find((h) => !/Floor/.test(h.object.name));
-    if (highlighted) { highlighted.material.emissive?.setHex(0); highlighted = null; }
-    if (!hit) { pick.style.display = 'none'; return; }
-    const o = hit.object;
-    if (o.material?.emissive) { o.material = o.material.clone(); o.material.emissive.setHex(0x333333); highlighted = o; }
-    const names = [];
-    for (let p = o; p && p !== model; p = p.parent) if (p.name) names.push(p.name);
-    const values = Object.assign({}, ...names.slice().reverse().map((n) => attrs.get(n) || {}));
-    document.getElementById('pickName').textContent = names.slice(0, 2).reverse().join(' / ') || o.name;
-    const dl = document.getElementById('pickAttrs');
-    dl.replaceChildren(...Object.entries(values).filter(([, v]) => v !== '').flatMap(([k, v]) => {
-      const dt = document.createElement('dt'); dt.textContent = k;
-      const dd = document.createElement('dd'); dd.style.margin = '0'; dd.textContent = v;
-      return [dt, dd];
-    }));
-    pick.style.display = 'block';
+  const meshes = new Map();
+  model.traverse((o) => {
+    if (!o.isMesh) return;
+    meshes.set(pathOf(o, model), o);
+    o.userData.original = o.material;
+    if (/CDU_Gallery/.test(o.name)) {
+      o.material = o.material.clone();
+      o.material.transparent = true;
+      o.material.opacity = 0.45;
+      o.material.depthWrite = false;
+      o.userData.original = o.material;
+    }
   });
-} catch (e) {
-  status.textContent = `Could not load ${url}: ${e.message || e}`;
-  console.error(e);
+  return { model, meta, meshes };
 }
 
-// Follow the container's size (also when the page was opened in a background tab at 0 × 0).
-const view = document.getElementById('view');
+const proposed = await load('scene.usda').catch((e) => { $('status').textContent = `Could not load scene.usda: ${e.message || e}`; throw e; });
+const baseline = await load('baseline.usda').catch(() => null);
+scene.add(proposed.model);
+
+// Header: title, space check, changes against the baseline.
+const root = attrsOf(proposed.meta, 'CoolingSystem');
+$('title').textContent = root.coolant
+  ? `Liquid cooling · ${Number(root.itLoadKw) / 1000} MW · ${root.coolant}${root.runReference ? ` · ${root.runReference}` : ''}`
+  : 'OpenUSD scene';
+if (proposed.meta.doc) $('sub').textContent = proposed.meta.doc;
+if (root.spaceCheck) {
+  const el = $('space');
+  el.hidden = false;
+  el.className = `check ${root.spaceCheck === 'PASS' ? 'pass' : 'fail'}`;
+  el.textContent = `Space check ${root.spaceCheck}: ${root.spaceFinding}`;
+}
+if (root.changes && root.baselineRun) {
+  const ul = $('changes');
+  ul.hidden = false;
+  const head = document.createElement('li');
+  head.style.listStyle = 'none';
+  head.style.marginLeft = '-18px';
+  head.textContent = `Changes from baseline ${root.baselineRun}:`;
+  ul.append(head, ...root.changes.split('; ').map((c) => { const li = document.createElement('li'); li.textContent = c; return li; }));
+}
+
+// Compare: classify each proposed part against the baseline by prim path, position, size and values.
+const COLORS = { added: 0x2fbf71, changed: 0xf0a020, removed: 0xe04040, same: 0xb8c2cb };
+const diffMaterial = {
+  added: new THREE.MeshStandardMaterial({ color: COLORS.added, roughness: 0.5 }),
+  changed: new THREE.MeshStandardMaterial({ color: COLORS.changed, roughness: 0.5 }),
+  removed: new THREE.MeshStandardMaterial({ color: COLORS.removed, transparent: true, opacity: 0.35, depthWrite: false }),
+  same: new THREE.MeshStandardMaterial({ color: COLORS.same, transparent: true, opacity: 0.4, depthWrite: false }),
+};
+const box = (o) => new THREE.Box3().setFromObject(o);
+const near = (a, b) => a.min.distanceTo(b.min) < 0.01 && a.max.distanceTo(b.max) < 0.01;
+const counts = { added: 0, changed: 0, removed: 0 };
+if (baseline) {
+  for (const [path, mesh] of proposed.meshes) {
+    if (/Floor|CDU_Gallery/.test(path)) { mesh.userData.diff = 'same'; continue; }
+    const before = baseline.meshes.get(path);
+    if (!before) mesh.userData.diff = 'added';
+    else {
+      const valuesA = JSON.stringify(attrsOf(baseline.meta, path));
+      const valuesB = JSON.stringify(attrsOf(proposed.meta, path));
+      mesh.userData.diff = near(box(before), box(mesh)) && valuesA === valuesB ? 'same' : 'changed';
+    }
+    if (mesh.userData.diff !== 'same') counts[mesh.userData.diff]++;
+  }
+  const ghosts = new THREE.Group();
+  for (const [path, mesh] of baseline.meshes)
+    if (!proposed.meshes.has(path) && !/Floor/.test(path)) {
+      const g = new THREE.Mesh(mesh.geometry, diffMaterial.removed);
+      g.applyMatrix4(mesh.matrixWorld);
+      g.name = mesh.name;
+      g.userData.ghostOf = path;
+      ghosts.add(g);
+      counts.removed++;
+    }
+  proposed.ghosts = ghosts;
+  $('modes').style.display = 'flex';
+}
+
+function setMode(mode) {
+  for (const b of document.querySelectorAll('#modes button')) b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
+  scene.remove(proposed.model);
+  if (baseline) scene.remove(baseline.model);
+  if (proposed.ghosts) scene.remove(proposed.ghosts);
+  if (mode === 'baseline') { scene.add(baseline.model); legend('normal'); }
+  else {
+    scene.add(proposed.model);
+    for (const mesh of proposed.meshes.values())
+      mesh.material = mode === 'compare' ? diffMaterial[mesh.userData.diff] : mesh.userData.original;
+    if (mode === 'compare') scene.add(proposed.ghosts);
+    legend(mode === 'compare' ? 'compare' : 'normal');
+  }
+  $('status').textContent = mode === 'compare'
+    ? `Compare with ${root.baselineRun ?? 'baseline'}: ${counts.added} added · ${counts.changed} changed · ${counts.removed} removed`
+    : `${mode === 'baseline' ? 'baseline.usda' : 'scene.usda'} · ${(mode === 'baseline' ? baseline : proposed).meshes.size} meshes · ${proposed.meta.up}-up`;
+}
+for (const b of document.querySelectorAll('#modes button')) b.addEventListener('click', () => setMode(b.dataset.mode));
+setMode('proposed');
+
+// Frame everything once, including any baseline parts outside the proposed layout.
+const frame = box(proposed.model);
+if (baseline) frame.union(box(baseline.model));
+const centre = frame.getCenter(new THREE.Vector3());
+const size = frame.getSize(new THREE.Vector3()).length();
+// From the CDU end of the hall (USD -X), looking along the rows.
+camera.position.copy(centre).add(new THREE.Vector3(-0.9, 0.75, 0.75).normalize().multiplyScalar(size * 1.0));
+controls.target.copy(centre);
+controls.update();
+
+// Click a part: its name and nova: values (the part's own, over its group's).
+const ray = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+renderer.domElement.addEventListener('click', (e) => {
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObjects(scene.children, true).find((h) => !/Floor|CDU_Gallery/.test(h.object.name));
+  const pick = $('pick');
+  if (!hit) { pick.style.display = 'none'; return; }
+  const o = hit.object;
+  const inBaseline = baseline && baseline.model.getObjectById(o.id);
+  const src = inBaseline ? baseline : proposed;
+  const path = o.userData.ghostOf ?? pathOf(o, src.model);
+  const parts = path.split('/');
+  const values = {};
+  for (let i = 1; i <= parts.length; i++) Object.assign(values, attrsOf(src.meta, parts.slice(0, i).join('/')));
+  if (o.userData.diff && o.userData.diff !== 'same') values.comparedToBaseline = o.userData.diff;
+  if (o.userData.ghostOf) values.comparedToBaseline = 'removed';
+  $('pickName').textContent = parts.slice(-2).join(' / ');
+  $('pickAttrs').replaceChildren(...Object.entries(values).filter(([, v]) => v !== '').flatMap(([k, v]) => {
+    const dt = document.createElement('dt'); dt.textContent = k;
+    const dd = document.createElement('dd'); dd.textContent = v;
+    return [dt, dd];
+  }));
+  pick.style.display = 'block';
+});
+
+// Follow the container's size (also when opened in a background tab at 0 × 0).
+const view = $('view');
 new ResizeObserver(() => {
   const w = view.clientWidth || innerWidth;
   const h = view.clientHeight || innerHeight;

@@ -22,7 +22,65 @@ export type CoolingDesign = {
   facilityWaterC: number;
   /** CATIA Magic element ids, when the SysML model exists (traceability). */
   sysml?: Record<string, string>;
+  /** The approved configuration this one changes, and what changed (from designDiff). */
+  baseline?: { runReference: string; changes: string[] };
 };
+
+const mm = (m: number) => `${Math.round(m * 1000)} mm`;
+
+/** Length of the hall's CDU gallery along the rows (illustrative lab room). */
+export const CDU_GALLERY_M = 4.2;
+const CDU_GAP_M = 0.1;
+/** Unit width from its capacity class: 500 kW class 0.8 m, larger classes 0.95 m (illustrative). */
+const capacityOf = (d: CoolingDesign) =>
+  d.cduCapacityKw ?? Number(d.cduModel.match(/(\d{2,5})/)?.[1] ?? 0);
+export const cduWidth = (d: CoolingDesign) => (capacityOf(d) > 600 ? 0.95 : 0.8);
+/** Do the CDUs fit the gallery? The numbers can pass while the room cannot hold the units. */
+export function layoutCheck(d: CoolingDesign) {
+  const width = cduWidth(d);
+  const requiredM = Math.round((d.cduUnits * width + (d.cduUnits - 1) * CDU_GAP_M) * 100) / 100;
+  const fits = requiredM <= CDU_GALLERY_M;
+  return {
+    result: fits ? ('PASS' as const) : ('FAIL' as const),
+    requiredM,
+    availableM: CDU_GALLERY_M,
+    finding: fits
+      ? `${d.cduUnits} CDUs need ${requiredM} m of the ${CDU_GALLERY_M} m CDU gallery.`
+      : `${d.cduUnits} CDUs need ${requiredM} m but the CDU gallery is ${CDU_GALLERY_M} m: ${Math.round((requiredM - CDU_GALLERY_M) * 100) / 100} m too long.`,
+  };
+}
+/** Pipe inner diameters that follow from a design (as drawn in the scene). */
+export function pipeSizes(d: CoolingDesign) {
+  const rows = d.rackCount > 8 ? 2 : 1;
+  return {
+    distribution: diameter(d.flowLpm),
+    rowHeader: diameter(d.flowLpm / rows),
+    rackDrop: diameter(d.rackFlowLpm),
+  };
+}
+/** What changed between an approved design and a proposed one, in plain words. */
+export function designDiff(base: CoolingDesign, next: CoolingDesign): string[] {
+  const out: string[] = [];
+  const num = (label: string, a: number, b: number, unit = '') => {
+    if (Math.abs(a - b) > 1e-9) out.push(`${label} ${a}${unit} → ${b}${unit}`);
+  };
+  num('IT load', base.itLoadKw, next.itLoadKw, ' kW');
+  num('racks', base.rackCount, next.rackCount);
+  if (base.coolant !== next.coolant) out.push(`coolant ${base.coolant} → ${next.coolant}`);
+  const units = (d: CoolingDesign) => `${d.cduUnits} × ${d.cduModel} (${d.cduDutyUnits} duty)`;
+  if (units(base) !== units(next)) out.push(`CDUs ${units(base)} → ${units(next)}`);
+  num('supply', base.supplyC, next.supplyC, ' °C');
+  num('return', base.returnC, next.returnC, ' °C');
+  num('total flow', base.flowLpm, next.flowLpm, ' L/min');
+  num('flow per rack', base.rackFlowLpm, next.rackFlowLpm, ' L/min');
+  num('facility water', base.facilityWaterC, next.facilityWaterC, ' °C');
+  const [a, b] = [pipeSizes(base), pipeSizes(next)];
+  if (a.distribution !== b.distribution)
+    out.push(`distribution header ${mm(a.distribution)} → ${mm(b.distribution)}`);
+  if (a.rowHeader !== b.rowHeader) out.push(`row headers ${mm(a.rowHeader)} → ${mm(b.rowHeader)}`);
+  if (a.rackDrop !== b.rackDrop) out.push(`rack drops ${mm(a.rackDrop)} → ${mm(b.rackDrop)}`);
+  return out;
+}
 
 /** The configuration from the live run (COOL-2610…, PG25, N+1). */
 export const EXAMPLE: CoolingDesign = {
@@ -62,6 +120,8 @@ const LOOKS: Record<string, V3> = {
   Supply: [0.09, 0.41, 0.64],
   Return: [0.78, 0.2, 0.16],
   Facility: [0.2, 0.55, 0.25],
+  Gallery: [0.95, 0.75, 0.2],
+  Clash: [0.85, 0.12, 0.1],
 };
 
 export function coolingUsd(d: CoolingDesign) {
@@ -200,8 +260,18 @@ export function coolingUsd(d: CoolingDesign) {
   const zSupply = RACK.h + 0.35;
   const zReturn = RACK.h + 0.65;
   const spanY: [number, number] = [-0.6, rowY(rows - 1) + 0.6];
-  const cduY = (i: number) =>
-    spanY[0] + 0.1 + ((spanY[1] - spanY[0] - 0.2) * (i + 0.5)) / d.cduUnits;
+  // CDUs side by side in the gallery, centred when they fit; otherwise they run past its end.
+  const space = layoutCheck(d);
+  const unitW = cduWidth(d);
+  const galleryMid = (spanY[0] + spanY[1]) / 2;
+  const galleryStart = galleryMid - CDU_GALLERY_M / 2;
+  const galleryEnd = galleryMid + CDU_GALLERY_M / 2;
+  const firstY =
+    space.result === 'PASS'
+      ? galleryMid - space.requiredM / 2 + unitW / 2
+      : galleryStart + unitW / 2;
+  const cduY = (i: number) => firstY + i * (unitW + CDU_GAP_M);
+  const outside = (i: number) => cduY(i) + unitW / 2 > galleryEnd + 1e-6;
   const mainDia = diameter(d.flowLpm);
   const rowDia = diameter(d.flowLpm / rows);
   const unitDia = diameter(d.flowLpm / d.cduDutyUnits);
@@ -234,6 +304,14 @@ export function coolingUsd(d: CoolingDesign) {
       flowLpm: d.flowLpm,
       facilityWaterC: d.facilityWaterC,
       ...(d.sysml?.system ? { sysmlElementId: d.sysml.system } : {}),
+      ...(d.baseline
+        ? {
+            baselineRun: d.baseline.runReference,
+            changes: d.baseline.changes.join('; ') || 'no change',
+          }
+        : {}),
+      spaceCheck: space.result,
+      spaceFinding: space.finding,
     }),
     '',
     '    def Scope "Looks"',
@@ -250,6 +328,7 @@ export function coolingUsd(d: CoolingDesign) {
       `                color3f inputs:diffuseColor = ${v3(c)}`,
       `                float inputs:metallic = ${name.startsWith('Cdu') || name === 'Rack' ? 0.4 : name === 'Floor' ? 0 : 0.6}`,
       `                float inputs:roughness = ${name === 'Floor' ? 0.9 : 0.35}`,
+      ...(name === 'Gallery' ? ['                float inputs:opacity = 0.45'] : []),
       '                token outputs:surface',
       '            }',
       '        }',
@@ -258,8 +337,8 @@ export function coolingUsd(d: CoolingDesign) {
 
   const minX = cduX - CDU.d / 2 - 1.6;
   const maxX = rowEnd + 1.0;
-  const minY = spanY[0] - 1.2;
-  const maxY = spanY[1] + 1.2;
+  const minY = Math.min(spanY[0], galleryStart) - 1.2;
+  const maxY = Math.max(spanY[1], galleryEnd, cduY(d.cduUnits - 1) + unitW / 2) + 1.2;
   out.push(
     ...box(
       1,
@@ -288,19 +367,35 @@ export function coolingUsd(d: CoolingDesign) {
       ),
     );
   }
-  out.push('    }', '', '    def Xform "CoolantDistributionUnits"', '    {');
+  out.push(
+    '    }',
+    '',
+    ...box(
+      1,
+      'CDU_Gallery',
+      [CDU.d + 0.4, CDU_GALLERY_M, 0.02],
+      [cduX, galleryMid, 0.012],
+      'Gallery',
+      { lengthM: CDU_GALLERY_M, requiredM: space.requiredM, spaceCheck: space.result },
+      'CDU gallery',
+    ),
+    '',
+    '    def Xform "CoolantDistributionUnits"',
+    '    {',
+  );
   for (let i = 0; i < d.cduUnits; i++) {
     const duty = i < d.cduDutyUnits;
     out.push(
       ...box(
         2,
         `CDU_${i + 1}`,
-        [CDU.d, CDU.w * 0.94, CDU.h],
+        [CDU.d, unitW * 0.96, CDU.h],
         [cduX, cduY(i), CDU.h / 2],
-        duty ? 'CduDuty' : 'CduStandby',
+        outside(i) ? 'Clash' : duty ? 'CduDuty' : 'CduStandby',
         {
           model: d.cduModel,
           role: duty ? 'duty' : 'standby',
+          ...(outside(i) ? { clash: 'outside the CDU gallery' } : {}),
           ...(d.cduCapacityKw ? { capacityKw: d.cduCapacityKw } : {}),
           ...(d.sysml?.cdu ? { sysmlElementId: d.sysml.cdu } : {}),
         },

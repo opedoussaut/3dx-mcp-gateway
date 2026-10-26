@@ -101,10 +101,21 @@ In either mode:
 - After a rework, update the same model; the earlier reference is in `runContext.stages`.
 
 **Update 3D view.** This task records the OpenUSD 3D view of the run (`view3d_reference`, `view3d_revision`, `view3d_summary`).
-- After *Update system model*, call `view3d_build` with the run reference. The connector builds the scene from the values already written to ITEROP for this run, linked to the system model, and writes the `.usda` file locally.
+- After *Update system model*, call `view3d_build` with the run reference (and `baselineRun` for a change, see below). The connector builds the scene from the values already written to ITEROP for this run, linked to the system model, and writes the `.usda` file locally.
+- `view3d_build` also runs a **space check**: do the CDUs fit the CDU gallery? The heat balance can pass while the room can't hold the units. **If it is FAIL, say so prominently**: the finding, the red units in the 3D view, and that the engineer should look at it at sign-off. Never hide or soften it. In `step` mode, ask whether to record it as is (the engineer decides at sign-off) or to redesign first.
 - Write its `taskValues` to the task **unchanged**: the task accepts nothing else.
 - Tell the user how to look at it: the `view` command it returns (`npm run twin:view -- …`), then <http://127.0.0.1:8765>.
 - The geometry is schematic and synthetic. Say so, and never present it as a validated layout.
+
+## Changes against an approved baseline
+
+When the user describes a change to an existing, approved configuration ("Hall B is expanding to 24 racks", "move to water"), treat it as an **engineering change**, not a new design:
+1. **Identify the baseline.** Ask for the run reference of the approved configuration if the user doesn't give it. Read it: `iterop_get_task` is not available for a closed run, so use what the user and `view3d_build` report, and `cameo_find` in the NOVA Lab package for the existing model.
+2. **State the impact first:** what changes (load, racks, coolant, units, flows, pipe sizes) and what stays. Then redesign and run `cooling_check`.
+3. **Start a new run** of the cooling chain for the changed configuration, and write the stages as usual. Mention the baseline in the coolant rationale (for example "Change from COOL-…: hall expansion to 24 racks").
+4. **Modify the existing model; never build a second one.** Update the existing *Cooling System* block and its parts with `cameo_update_element`, `cameo_set_specification` and `cameo_set_tagged_values`; add only what is new. Model repeated units as one part with a multiplicity, so that a different unit count is a value change, not a deletion (the connector cannot delete).
+5. **3D:** call `view3d_build` with `baselineRun`. The summary written to ITEROP then lists the changes, and the `view` command opens the viewer with *Baseline / Proposed / Compare*.
+6. **After a rejection** (for example "the CDUs don't fit the gallery"), the rework loop runs as usual. Redesign from the reviewer's request, for example fewer, larger units, then update the same model again and rebuild the 3D view against the same baseline.
 
 Task names may carry a lane prefix, such as "[Operator (NOVA acts as you)] Select coolant"; it is the same task. Run references look like `COOL-YYMMDD-HHMMSS` (`COOL-251008-141210`).
 

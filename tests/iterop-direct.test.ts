@@ -464,3 +464,96 @@ test('a sign-off decision the tenant stores as a Boolean is read as Approve or R
   );
   assert.ok(!ctx.gaps.some((g) => /decision and comment/.test(g)));
 });
+
+test('a change against an approved baseline: the 3D view states what changed and catches a space problem', async () => {
+  const { call } = await connect({
+    engine: new SyntheticEngine(),
+    processes: definitions.map((d) => d.key),
+  });
+  const { started: baseline } = await driveChain(call);
+
+  // Hall expansion: 24 racks, 1.8 MW, scaled up with more CDU-500 units.
+  const proposal = {
+    coolantSelection_fluid: 'PG25',
+    coolantSelection_cp: 3.9,
+    coolantSelection_density: 1020,
+    cduSizing_model: 'CDU-500',
+    cduCapacityKw: 500,
+    cduSizing_units: 6,
+    cduSizing_dutyUnits: 5,
+    cduSizing_utilisation: 72,
+    loopConfiguration_supplyC: 35,
+    loopConfiguration_returnC: 45,
+    loopConfiguration_flowLpm: 2715,
+    loopConfiguration_rackFlowLpm: 113.1,
+  };
+  const check = await call('cooling_check', {
+    envelope: { itLoadKw: 1800, facilityWaterC: 32, rackCount: 24, redundancy: 'N+1' },
+    proposal,
+  });
+  // The numbers pass: only the room will not hold the units.
+  assert.equal(check.result, 'PASS', JSON.stringify(check.findings));
+  const pick = (p: string) =>
+    Object.fromEntries(Object.entries(proposal).filter(([k]) => k.startsWith(p)));
+  const change = await call('iterop_start_process', {
+    processKey: 'syn-cooling-chain',
+    values: { ...START, start_itLoadKw: 1800, start_rackCount: 24 },
+    runReference: 'COOL-261027-090000',
+  });
+  let next = change.nextTask;
+  for (const values of [
+    { ...pick('coolantSelection_'), coolantSelection_rationale: 'Unchanged coolant.' },
+    pick('cduSizing_'),
+    pick('loopConfiguration_'),
+    check.checkTaskValues,
+    {
+      systemModel_reference: 'LAB-PROJECT/CoolingSystem',
+      systemModel_revision: 'r2',
+      systemModel_summary: 'Cooling System updated for 24 racks and 6 CDUs.',
+    },
+  ])
+    next = (await call('iterop_complete_task', { taskId: next.taskId, values })).nextTask;
+
+  const same = await call('view3d_build', {
+    runReference: change.runReference,
+    baselineRun: change.runReference,
+  });
+  assert.equal(same.isError, true);
+  const view = await call('view3d_build', {
+    runReference: change.runReference,
+    baselineRun: baseline.runReference,
+  });
+  assert.equal(view.isError, undefined, JSON.stringify(view));
+  assert.equal(view.spaceCheck.result, 'FAIL');
+  assert.match(
+    view.taskValues.view3d_summary,
+    /Space check FAIL: 6 CDUs need 5\.3 m but the CDU gallery is 4\.2 m/,
+  );
+  assert.match(
+    view.taskValues.view3d_summary,
+    new RegExp(`Change from baseline ${baseline.runReference}: .*racks 16 → 24`),
+  );
+  assert.ok(view.changes.includes('CDUs 4 × CDU-500 (3 duty) → 6 × CDU-500 (5 duty)'));
+  assert.match(view.view, /--baseline /);
+  const usda = readFileSync(view.file, 'utf8');
+  assert.match(usda, /custom string nova:spaceCheck = "FAIL"/);
+  assert.equal(
+    (usda.match(/custom string nova:clash = "outside the CDU gallery"/g) ?? []).length,
+    2,
+  );
+  // The finding is recorded in ITEROP, where the engineer decides.
+  const recorded = await call('iterop_complete_task', {
+    taskId: next.taskId,
+    values: view.taskValues,
+  });
+  assert.equal(recorded.isError, undefined, JSON.stringify(recorded));
+});
+
+test('the space check passes with fewer, larger units', async () => {
+  const { layoutCheck, EXAMPLE } = await import('../server/twin/cooling-usd');
+  assert.equal(layoutCheck(EXAMPLE).result, 'PASS');
+  assert.equal(layoutCheck({ ...EXAMPLE, cduUnits: 6, cduDutyUnits: 5 }).result, 'FAIL');
+  const larger = layoutCheck({ ...EXAMPLE, cduModel: 'CDU-800', cduCapacityKw: 800 });
+  assert.equal(larger.result, 'PASS');
+  assert.equal(larger.requiredM, 4.1);
+});

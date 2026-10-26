@@ -6,6 +6,18 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "twin:view"],
       "port": 8765
+    },
+    {
+      "name": "twin-story-change1",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "twin:view", "--", ".private/twin/story-change1.usda", "--baseline", ".private/twin/story-baseline.usda", "--port", "8771"],
+      "port": 8771
+    },
+    {
+      "name": "twin-story-change2",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "twin:view", "--", ".private/twin/story-change2.usda", "--baseline", ".private/twin/story-baseline.usda", "--port", "8772"],
+      "port": 8772
     }
   ]
 }

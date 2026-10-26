@@ -8,7 +8,7 @@ import { verifyReceipt } from '../cameo/receipt';
 import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { coolingUsd } from '../twin/cooling-usd';
+import { coolingUsd, designDiff, layoutCheck, type CoolingDesign } from '../twin/cooling-usd';
 import { EngineError, type ProcessEngine } from './simulator';
 
 /**
@@ -339,14 +339,86 @@ export function registerDirectTools(server: McpServer, o: DirectOptions) {
     },
   );
 
+  /**
+   * The design as written to ITEROP for one run, from this connector's run record (latest pass).
+   * Never from the model's own arguments: the 3D view shows what was recorded.
+   */
+  const recordedDesign = (
+    runReference: string,
+  ): { design: CoolingDesign; modelRef?: string } | { missing: string[] } => {
+    const r = journal.get(runReference);
+    const start = r?.start ?? {};
+    const stage = (sid: string) => r?.stages[sid]?.values ?? {};
+    const coolant = stage('coolantSelection');
+    const cdu = stage('cduSizing');
+    const loop = stage('loopConfiguration');
+    const model = stage('systemModel');
+    const need: [string, unknown][] = [
+      ['start_itLoadKw', start.start_itLoadKw],
+      ['start_rackCount', start.start_rackCount],
+      ['start_facilityWaterC', start.start_facilityWaterC],
+      ['coolantSelection_fluid', coolant.coolantSelection_fluid],
+      ['cduSizing_model', cdu.cduSizing_model],
+      ['cduSizing_units', cdu.cduSizing_units],
+      ['cduSizing_dutyUnits', cdu.cduSizing_dutyUnits],
+      ['loopConfiguration_supplyC', loop.loopConfiguration_supplyC],
+      ['loopConfiguration_returnC', loop.loopConfiguration_returnC],
+      ['loopConfiguration_flowLpm', loop.loopConfiguration_flowLpm],
+      ['loopConfiguration_rackFlowLpm', loop.loopConfiguration_rackFlowLpm],
+    ];
+    const missing = need.filter(([, val]) => val === undefined).map(([k]) => k);
+    if (missing.length) return { missing };
+    const num = (val: unknown) => Number(val);
+    const modelRef = model.systemModel_reference ? String(model.systemModel_reference) : undefined;
+    const sysmlId = modelRef?.match(/\[([A-Za-z0-9_.:-]+)\]\s*$/)?.[1];
+    const unitModel = String(cdu.cduSizing_model);
+    const capacity = Number(
+      unitModel.match(/(\d{2,5})\s*kW/i)?.[1] ?? unitModel.match(/-(\d{2,5})\b/)?.[1],
+    );
+    return {
+      modelRef,
+      design: {
+        runReference,
+        itLoadKw: num(start.start_itLoadKw),
+        rackCount: num(start.start_rackCount),
+        facilityWaterC: num(start.start_facilityWaterC),
+        coolant: String(coolant.coolantSelection_fluid),
+        cduModel: unitModel,
+        cduUnits: num(cdu.cduSizing_units),
+        cduDutyUnits: num(cdu.cduSizing_dutyUnits),
+        ...(Number.isFinite(capacity) ? { cduCapacityKw: capacity } : {}),
+        supplyC: num(loop.loopConfiguration_supplyC),
+        returnC: num(loop.loopConfiguration_returnC),
+        flowLpm: num(loop.loopConfiguration_flowLpm),
+        rackFlowLpm: num(loop.loopConfiguration_rackFlowLpm),
+        ...(sysmlId ? { sysml: { system: sysmlId } } : {}),
+      },
+    };
+  };
+  const noRecord = (run: string, missing: string[]) =>
+    text(
+      {
+        engine: engineLabel,
+        error: `This connector has no record of these values for ${run}: ${missing.join(', ')}. 3D views are built only from values written to ITEROP through this connector.`,
+      },
+      true,
+    );
+
   // 3D views this session generated: only these may be written to "Update 3D view".
   const issuedViews = new Set<string>();
   server.registerTool(
     'view3d_build',
     {
       description:
-        'Generate the OpenUSD 3D view of a cooling run (no platform request) from the values this connector wrote to ITEROP for it (start values, coolant, CDU sizing, loop), linked to the system model when "Update system model" is done. Writes the .usda file locally and returns the exact values for the "Update 3D view" task, which accepts nothing else. Geometry is schematic and synthetic.',
-      inputSchema: { runReference: z.string().regex(/^[A-Z]+-[0-9-]+$/) },
+        'Generate the OpenUSD 3D view of a cooling run (no platform request) from the values this connector wrote to ITEROP for it (start values, coolant, CDU sizing, loop), linked to the system model when "Update system model" is done. It also runs a space check (do the CDUs fit the CDU gallery?) that the numbers alone cannot show; report a FAIL to the user and never hide it. For a change, pass baselineRun (the approved run it modifies): the scene and the task summary then state what changed, and the viewer can compare both. Writes the .usda files locally and returns the exact values for the "Update 3D view" task, which accepts nothing else. Geometry is schematic and synthetic.',
+      inputSchema: {
+        runReference: z.string().regex(/^[A-Z]+-[0-9-]+$/),
+        baselineRun: z
+          .string()
+          .regex(/^[A-Z]+-[0-9-]+$/)
+          .optional()
+          .describe('The approved run this configuration changes.'),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -354,89 +426,58 @@ export function registerDirectTools(server: McpServer, o: DirectOptions) {
         openWorldHint: false,
       },
     },
-    async ({ runReference }) => {
-      const r = journal.get(runReference);
-      const start = r?.start ?? {};
-      const stage = (sid: string) => r?.stages[sid]?.values ?? {};
-      const coolant = stage('coolantSelection');
-      const cdu = stage('cduSizing');
-      const loop = stage('loopConfiguration');
-      const model = stage('systemModel');
-      const need: [string, unknown][] = [
-        ['start_itLoadKw', start.start_itLoadKw],
-        ['start_rackCount', start.start_rackCount],
-        ['start_facilityWaterC', start.start_facilityWaterC],
-        ['coolantSelection_fluid', coolant.coolantSelection_fluid],
-        ['cduSizing_model', cdu.cduSizing_model],
-        ['cduSizing_units', cdu.cduSizing_units],
-        ['cduSizing_dutyUnits', cdu.cduSizing_dutyUnits],
-        ['loopConfiguration_supplyC', loop.loopConfiguration_supplyC],
-        ['loopConfiguration_returnC', loop.loopConfiguration_returnC],
-        ['loopConfiguration_flowLpm', loop.loopConfiguration_flowLpm],
-        ['loopConfiguration_rackFlowLpm', loop.loopConfiguration_rackFlowLpm],
-      ];
-      const missing = need.filter(([, val]) => val === undefined).map(([k]) => k);
-      if (missing.length)
-        return text(
-          {
-            engine: engineLabel,
-            error: `This connector has no record of these values for ${runReference}: ${missing.join(', ')}. The 3D view is built only from values written to ITEROP in this run.`,
-          },
-          true,
-        );
-      const num = (val: unknown) => Number(val);
-      const modelRef = model.systemModel_reference
-        ? String(model.systemModel_reference)
-        : undefined;
-      const sysmlId = modelRef?.match(/\[([A-Za-z0-9_.:-]+)\]\s*$/)?.[1];
-      const unitModel = String(cdu.cduSizing_model);
-      const capacity = Number(
-        unitModel.match(/(\d{2,5})\s*kW/i)?.[1] ?? unitModel.match(/-(\d{2,5})\b/)?.[1],
-      );
-      const racks = num(start.start_rackCount);
-      const units = num(cdu.cduSizing_units);
-      const duty = num(cdu.cduSizing_dutyUnits);
-      const flow = num(loop.loopConfiguration_flowLpm);
-      const supply = num(loop.loopConfiguration_supplyC);
-      const ret = num(loop.loopConfiguration_returnC);
-      const fluid = String(coolant.coolantSelection_fluid);
-      const usda = coolingUsd({
-        runReference,
-        itLoadKw: num(start.start_itLoadKw),
-        rackCount: racks,
-        facilityWaterC: num(start.start_facilityWaterC),
-        coolant: fluid,
-        cduModel: unitModel,
-        cduUnits: units,
-        cduDutyUnits: duty,
-        ...(Number.isFinite(capacity) ? { cduCapacityKw: capacity } : {}),
-        supplyC: supply,
-        returnC: ret,
-        flowLpm: flow,
-        rackFlowLpm: num(loop.loopConfiguration_rackFlowLpm),
-        ...(sysmlId ? { sysml: { system: sysmlId } } : {}),
-      });
+    async ({ runReference, baselineRun }) => {
+      const now = recordedDesign(runReference);
+      if ('missing' in now) return noRecord(runReference, now.missing);
       const dir = o.twinDir ?? '.private/twin';
       mkdirSync(dir, { recursive: true });
+      let changes: string[] | undefined;
+      let baselineFile: string | undefined;
+      if (baselineRun) {
+        if (baselineRun === runReference)
+          return text(
+            { engine: engineLabel, error: 'The baseline must be another, approved run.' },
+            true,
+          );
+        const base = recordedDesign(baselineRun);
+        if ('missing' in base) return noRecord(baselineRun, base.missing);
+        changes = designDiff(base.design, now.design);
+        baselineFile = join(dir, `${baselineRun}.usda`);
+        writeFileSync(baselineFile, coolingUsd(base.design));
+      }
+      const d = now.design;
+      const usda = coolingUsd({
+        ...d,
+        ...(baselineRun ? { baseline: { runReference: baselineRun, changes: changes! } } : {}),
+      });
       const file = join(dir, `${runReference}.usda`);
       writeFileSync(file, usda);
       const sha = createHash('sha256').update(usda).digest('hex').slice(0, 12);
       const at = (o.now ?? (() => new Date()))().toISOString().slice(0, 16).replace('T', ' ');
+      const space = layoutCheck(d);
+      const change = baselineRun
+        ? ` Change from baseline ${baselineRun}: ${changes!.length ? changes!.join('; ') : 'no change'}.`
+        : '';
       const taskValues = {
         view3d_reference: `twin/${runReference}.usda`,
         view3d_revision: `sha256 ${sha} · generated ${at} UTC`,
         view3d_summary:
-          `${racks} racks, ${units} × ${unitModel} (${duty} duty, ${units - duty} standby), secondary loop ${flow} L/min at ${supply} → ${ret} °C, ${fluid}. ${modelRef ? `Linked to system model ${modelRef}.` : 'No system model linked.'} Schematic, synthetic geometry.`.slice(
+          `${d.rackCount} racks, ${d.cduUnits} × ${d.cduModel} (${d.cduDutyUnits} duty, ${d.cduUnits - d.cduDutyUnits} standby), secondary loop ${d.flowLpm} L/min at ${d.supplyC} → ${d.returnC} °C, ${d.coolant}. Space check ${space.result}: ${space.finding}${change} ${now.modelRef ? `Linked to system model ${now.modelRef}.` : 'No system model linked.'} Schematic, synthetic geometry.`.slice(
             0,
             1500,
           ),
       };
       issuedViews.add(JSON.stringify(taskValues));
+      const slash = (p: string) => p.split('\\').join('/');
       return text({
         engine: engineLabel,
         taskValues,
+        spaceCheck: space,
+        ...(changes ? { changes } : {}),
         file,
-        view: `npm run twin:view -- ${file.split('\\').join('/')}`,
+        view: baselineFile
+          ? `npm run twin:view -- ${slash(file)} --baseline ${slash(baselineFile)}`
+          : `npm run twin:view -- ${slash(file)}`,
       });
     },
   );
