@@ -96,6 +96,8 @@ test('task names prefixed with their BPMN lane still match the lab definition', 
   assert.ok(sameTask('[Operator (NOVA acts as you)] Select coolant', 'Select coolant'));
   assert.ok(!sameTask('[Operator] Select coolant again', 'Select coolant'));
   assert.ok(!sameTask('', ''));
+  assert.ok(sameTask('Update\nsystem model', 'Update system model'));
+  assert.ok(sameTask('[Engineer]  Update 3D\r\n view', 'Update 3D view'));
   let completed = false;
   const engine = createLiveEngine(config(), async (_input, init) => {
     if (init?.method === 'GET')

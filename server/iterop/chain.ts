@@ -285,6 +285,8 @@ export const definition = (key: string) => definitions.find((d) => d.key === key
 export const taskName = (name: string | null | undefined) =>
   (name ?? '')
     .replace(/^\s*\[[^\]]*\]\s*/, '')
+    // The designer keeps line breaks typed into a task label ("Update⏎system model").
+    .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
 export const sameTask = (a: string | null | undefined, b: string | null | undefined) =>
