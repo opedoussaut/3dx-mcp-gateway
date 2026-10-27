@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" width="1200" height="720" role="img" aria-labelledby="t d" font-family="Inter, 'Segoe UI', Roboto, Arial, sans-serif">
+  <title id="t">NOVA ITEROP lab architecture</title>
+  <desc id="d">Claude, signed in with the user's account, calls NOVA's MCP tools. The MCP server calls the local NOVA server, which plans the steps, applies the rules and holds every write for a person's approval. NOVA reaches the sandbox ITEROP through the API Gateway with an API key and a robot account. An engineer signs off in ITEROP Play.</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#1768a4"/>
+    </marker>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#0b6a6e"/>
+    </marker>
+    <style>
+      .box{fill:#fff;stroke:#d9e3ea;stroke-width:1.2}
+      .key{fill:#f0f6fb;stroke:#9cc2df;stroke-width:1.2}
+      .safe{fill:#f3fafa;stroke:#a9d9da;stroke-width:1.2}
+      .h{font-size:15px;font-weight:650;fill:#10283f}
+      .s{font-size:12.5px;fill:#5b6b7a}
+      .m{font-size:11px;font-weight:600;fill:#1768a4;letter-spacing:.06em}
+      .lab{font-size:11.5px;fill:#1768a4;font-weight:600}
+      .col{font-size:12px;font-weight:700;fill:#5b6b7a;letter-spacing:.08em}
+      .ln{stroke:#1768a4;stroke-width:1.6;fill:none}
+      .lg{stroke:#0b6a6e;stroke-width:1.6;fill:none;stroke-dasharray:5 4}
+      .item{font-size:12.5px;fill:#172b3d}
+    </style>
+  </defs>
+  <rect width="1200" height="720" fill="#f5f8fa"/>
+
+  <!-- column titles -->
+  <text x="24" y="40" class="col">PEOPLE &amp; CLAUDE</text>
+  <text x="290" y="40" class="col">YOUR COMPUTER · 127.0.0.1 ONLY</text>
+  <text x="810" y="40" class="col">SANDBOX TENANT · SYNTHETIC TEST PROCESSES</text>
+
+  <!-- containers -->
+  <rect x="290" y="56" width="484" height="560" rx="18" fill="#eef3f7" stroke="#c9d6e0" stroke-dasharray="6 5"/>
+  <rect x="810" y="56" width="366" height="560" rx="18" fill="#eef3f7" stroke="#c9d6e0" stroke-dasharray="6 5"/>
+
+  <!-- A: people and Claude -->
+  <rect x="24" y="86" width="226" height="128" rx="14" class="key"/>
+  <text x="40" y="112" class="m">1 · ASK</text>
+  <text x="40" y="134" class="h">Claude</text>
+  <text x="40" y="154" class="s">Desktop or Code, signed in with</text>
+  <text x="40" y="170" class="s">your own Claude account.</text>
+  <text x="40" y="192" class="s">Understands, chooses actions,</text>
+  <text x="40" y="208" class="s">explains results.</text>
+
+  <rect x="24" y="262" width="226" height="118" rx="14" class="box"/>
+  <text x="40" y="288" class="m">4 · APPROVE</text>
+  <text x="40" y="310" class="h">You, the operator</text>
+  <text x="40" y="330" class="s">NOVA page in your browser.</text>
+  <text x="40" y="348" class="s">Each write waits for your</text>
+  <text x="40" y="364" class="s">click — Claude cannot approve.</text>
+
+  <rect x="24" y="448" width="226" height="112" rx="14" class="box"/>
+  <text x="40" y="474" class="m">6 · SIGN OFF</text>
+  <text x="40" y="496" class="h">Engineer</text>
+  <text x="40" y="516" class="s">Reviews and signs in ITEROP.</text>
+  <text x="40" y="534" class="s">Reject → rework back to NOVA.</text>
+  <text x="40" y="550" class="s">Nobody else can sign.</text>
+
+  <!-- B: local -->
+  <rect x="314" y="86" width="204" height="128" rx="14" class="box"/>
+  <text x="330" y="112" class="m">2 · CONNECT</text>
+  <text x="330" y="134" class="h">NOVA MCP server</text>
+  <text x="330" y="154" class="s">13 lab actions: list, configure,</text>
+  <text x="330" y="170" class="s">what-if, continue, rework.</text>
+  <text x="330" y="192" class="s">Engine fixed by you,</text>
+  <text x="330" y="208" class="s">not by Claude.</text>
+
+  <rect x="556" y="86" width="196" height="474" rx="14" class="key"/>
+  <text x="572" y="112" class="m">3 · PLAN &amp; GUARD</text>
+  <text x="572" y="134" class="h">NOVA server</text>
+  <g class="item">
+    <rect x="570" y="152" width="168" height="40" rx="9" fill="#fff" stroke="#d9e3ea"/>
+    <text x="582" y="177">Orchestrator · plans steps</text>
+    <rect x="570" y="202" width="168" height="40" rx="9" fill="#fff" stroke="#d9e3ea"/>
+    <text x="582" y="227">Rules &amp; allow-list</text>
+    <rect x="570" y="252" width="168" height="40" rx="9" class="safe"/>
+    <text x="582" y="277" fill="#0b6a6e" font-weight="650">Approval gate</text>
+    <rect x="570" y="302" width="168" height="40" rx="9" fill="#fff" stroke="#d9e3ea"/>
+    <text x="582" y="327">Engineering tools*</text>
+    <rect x="570" y="352" width="168" height="40" rx="9" fill="#fff" stroke="#d9e3ea"/>
+    <text x="582" y="377">Simulated engine</text>
+    <rect x="570" y="402" width="168" height="40" rx="9" fill="#fff" stroke="#d9e3ea"/>
+    <text x="582" y="427">Run trace · links</text>
+  </g>
+  <text x="572" y="470" class="s">Same rules whether the</text>
+  <text x="572" y="486" class="s">request comes from Claude</text>
+  <text x="572" y="502" class="s">or the NOVA page.</text>
+  <text x="572" y="536" class="s" font-size="11">* illustrative values</text>
+
+  <rect x="314" y="448" width="204" height="112" rx="14" class="safe"/>
+  <text x="330" y="474" class="m" fill="#0b6a6e">SECRETS STAY HERE</text>
+  <text x="330" y="496" class="h">.env + lab contract</text>
+  <text x="330" y="516" class="s">API key and agent secret.</text>
+  <text x="330" y="534" class="s">Never sent to Claude,</text>
+  <text x="330" y="550" class="s">the browser or GitHub.</text>
+
+  <!-- C: tenant -->
+  <rect x="834" y="86" width="318" height="128" rx="14" class="box"/>
+  <text x="850" y="112" class="m">5 · ENTER</text>
+  <text x="850" y="134" class="h">API Gateway</text>
+  <text x="850" y="154" class="s">HTTPS, API key + Openness Agent.</text>
+  <text x="850" y="172" class="s">NOVA's own robot account:</text>
+  <text x="850" y="190" class="s">non-admin, run rights only,</text>
+  <text x="850" y="208" class="s">revocable at any time.</text>
+
+  <rect x="834" y="262" width="318" height="118" rx="14" class="box"/>
+  <text x="850" y="288" class="m">PROCESS ENGINE</text>
+  <text x="850" y="310" class="h">ITEROP Business Process API</text>
+  <text x="850" y="330" class="s">Read processes and tasks · start a</text>
+  <text x="850" y="348" class="s">process · complete NOVA's tasks.</text>
+  <text x="850" y="366" class="s">Nothing else is in NOVA's code.</text>
+
+  <rect x="834" y="448" width="318" height="112" rx="14" class="box"/>
+  <text x="850" y="474" class="m">SYSTEM OF RECORD</text>
+  <text x="850" y="496" class="h">ITEROP Play</text>
+  <text x="850" y="516" class="s">Process monitoring, history of who</text>
+  <text x="850" y="534" class="s">did what, human sign-off tasks.</text>
+  <text x="850" y="550" class="s">"Open in ITEROP" links land here.</text>
+
+  <!-- arrows -->
+  <path d="M250 150H312" class="ln" marker-end="url(#a)" marker-start="url(#a)"/>
+  <text x="258" y="142" class="lab">MCP</text>
+  <path d="M518 150H554" class="ln" marker-end="url(#a)" marker-start="url(#a)"/>
+  <text x="520" y="142" class="lab">local</text>
+  <path d="M250 320H554" class="ln" marker-end="url(#a)" marker-start="url(#a)"/>
+  <text x="300" y="312" class="lab">review · approve · reject</text>
+  <path d="M518 504H554" class="lg" marker-end="url(#g)"/>
+  <path d="M752 150H832" class="ln" marker-end="url(#a)" marker-start="url(#a)"/>
+  <text x="760" y="142" class="lab">HTTPS</text>
+  <path d="M993 214V260" class="ln" marker-end="url(#a)" marker-start="url(#a)"/>
+  <path d="M993 380V446" class="ln" marker-end="url(#a)" marker-start="url(#a)"/>
+  <path d="M137 560V642H993V562" class="ln" marker-end="url(#a)"/>
+  <text x="430" y="634" class="lab">engineer signs in ITEROP Play (no tool can sign)</text>
+
+  <!-- legend -->
+  <rect x="24" y="664" width="1152" height="40" rx="10" fill="#fcf4f3" stroke="#efd0cd"/>
+  <text x="40" y="689" font-size="13" fill="#b4322b" font-weight="650">Never possible from Claude or NOVA:</text>
+  <text x="290" y="689" font-size="13" fill="#172b3d">sign · reassign · stop · delete · deploy · change rights · touch processes outside the reviewed contract</text>
+</svg>

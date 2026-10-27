@@ -11,10 +11,6 @@ import { SPEC, operations, type SemanticOperation } from './operations';
  * (operations.ts). The contract only adds an optional base path for the tenant deployment,
  * the reviewed field mapping and the review evidence.
  */
-const propertyPath = z
-  .string()
-  .regex(/^[a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)*$/)
-  .refine((v) => !v.split('.').some((p) => ['__proto__', 'constructor', 'prototype'].includes(p)));
 const docUrl = z.url().refine((v) => {
   const u = new URL(v);
   return (
@@ -37,10 +33,6 @@ const binding = z
     requestSchemaReviewed: z.literal(true),
     responseSchemaReviewed: z.literal(true),
     csrf: z.literal('NOT_REQUIRED'),
-    rowsPath: propertyPath.optional(),
-    totalPath: propertyPath.optional(),
-    completePath: propertyPath.optional(),
-    fields: z.record(z.string(), propertyPath),
   })
   .strict();
 
@@ -50,7 +42,11 @@ export const iteropContractSchema = z
     app: z.literal('ITEROP'),
     release: z.string().min(1),
     specRelease: z.literal(SPEC.release),
-    apiVersion: z.string().min(1),
+    /** Binds the review to the exact specification file that was parsed. */
+    specSha256: z.literal(SPEC.sha256),
+    apiVersion: z.literal(SPEC.apiVersion),
+    /** FD04 documents startDate as int64 without a unit; set only after the first live read proves it. */
+    taskStartDateUnit: z.enum(['ms', 's', 'unverified']).default('unverified'),
     authenticationVerified: z.literal(true),
     authMode: z.enum(['bearer', 'basic']),
     securityContext: z.enum(['REQUIRED', 'NOT_REQUIRED']),
@@ -177,6 +173,6 @@ export function iteropStatus(config: IteropConfig): AppStatus {
     accessFinding:
       config.contract && !config.blockers.length
         ? `Reviewed contract installed (${config.contract.apiVersion}, verified ${config.contract.verifiedAt}). Live results still require a private proof run.`
-        : 'LIVE BLOCKED. The R2026x-FD04 Business Process API v2 documents these GET operations, but no route to the tenant is approved: Play sign-in is UI access only; the API Gateway route requires the PFI role (not held); a standalone REST key requires an ITEROP administrator. No tenant contract has been reviewed.',
+        : 'LIVE BLOCKED. The three read contracts are verified against R2026x-FD04 (Business Process API v2, BasicAuth declared). The specification does not grant access: no sanctioned route to your tenant (API Gateway with PFI, or an administrator-issued REST identity), no credential and no reviewed tenant contract yet.',
   };
 }

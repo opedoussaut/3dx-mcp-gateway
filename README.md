@@ -1,5 +1,7 @@
 # NOVA · Engineering workspace
 
+> **Branch `claude-iterop-orchestrator`:** a simplified, UI-free connector that lets Claude (your own Claude account) drive ITEROP directly. Start here: [docs/iterop/CLAUDE-DIRECT.md](docs/iterop/CLAUDE-DIRECT.md) · `npm run iterop:mcp`. After a rejection, each task carries its run context: [docs/iterop/REWORK-CONTEXT.md](docs/iterop/REWORK-CONTEXT.md).
+
 A natural-language engineering workspace with a governed, read-only **Business Process (ITEROP)** connector, an engineering-item gateway, a semantic MCP server, and an AURA observation lab (deferred).
 
 **Claude project handover:** Read [CLAUDE.md](CLAUDE.md) for implementation ownership and [the full handover](docs/CLAUDE-HANDOVER.md) for the verified baseline, architecture, setup, limitations, and continuation backlog.
@@ -34,16 +36,17 @@ The server binds to loopback. This is a private, single-operator application; th
 
 ## What works
 
-| Area                 | Implemented behavior                                                                                                                                                                                                                       |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Business Process     | Startable processes (`getAllStartableProcesses`), my tasks with overdue and next views (`getTasksByUser`, self only), process summary (`getBasicProcessInfo`), why a task needs attention, and local start drafts that are never submitted |
-| Mission control      | Natural-language input, Ask / Investigate / Act modes, five guided missions, session history, evidence inspection, execution traces and JSON export                                                                                        |
-| Engineering missions | Revision eligibility under the supplied synthetic policy, configured occurrence counting, revision comparison, qualification evidence review and local review drafts                                                                       |
-| Connection readiness | Server-side configuration checks, release-specific contract validation and a one-read identity check when a reviewed binding is installed                                                                                                  |
-| Read gateway         | Fixed tenant origin, named semantic tools, GET-only private bindings, bounded responses, field projection, explicit coverage, permission-denial stop and no redirects                                                                      |
-| MCP                  | A stdio server with two local utilities and six synthetic read adapters; live tools are exposed only when their private bindings are admitted                                                                                              |
-| AURA comparison      | Exact prompt copying, shared synthetic context pack, manual answer/time/citation capture, optional human scores, context declaration and observation export                                                                                |
-| Intelligence routing | Deterministic routing first; an optional local Ollama classifier for otherwise unrecognized intents, with explicit prompt-egress permission                                                                                                |
+| Area                 | Implemented behavior                                                                                                                                                                                                                                  |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Business Process     | Startable processes (`getAllStartableProcesses`), my tasks with overdue and next views (`getTasksByUser`, self only), process summary (`getBasicProcessInfo`), why a task needs attention, and local start drafts that are never submitted            |
+| Orchestration (lab)  | Natural-language commands that start a synthetic process, read each task form, run illustrative tools and complete tasks. Every write waits for approval; sign-off stays human; a rejection returns as rework. See `docs/iterop/LAB-ORCHESTRATION.md` |
+| Mission control      | Natural-language input, Ask / Investigate / Act modes, five guided missions, session history, evidence inspection, execution traces and JSON export                                                                                                   |
+| Engineering missions | Revision eligibility under the supplied synthetic policy, configured occurrence counting, revision comparison, qualification evidence review and local review drafts                                                                                  |
+| Connection readiness | Server-side configuration checks, release-specific contract validation and a one-read identity check when a reviewed binding is installed                                                                                                             |
+| Read gateway         | Fixed tenant origin, named semantic tools, GET-only private bindings, bounded responses, field projection, explicit coverage, permission-denial stop and no redirects                                                                                 |
+| MCP                  | A stdio server with two local utilities and six synthetic read adapters; live tools are exposed only when their private bindings are admitted                                                                                                         |
+| AURA comparison      | Exact prompt copying, shared synthetic context pack, manual answer/time/citation capture, optional human scores, context declaration and observation export                                                                                           |
+| Intelligence routing | Deterministic routing first; an optional local Ollama classifier for otherwise unrecognized intents, with explicit prompt-egress permission                                                                                                           |
 
 Known missions are solved by ordinary code over retrieved records. This version is not a general-purpose conversational model or a completed multi-agent implementation. The provider interface is designed for extensions; only the optional Ollama adapter is implemented, and a real model inference run has not been validated here.
 

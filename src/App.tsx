@@ -19,6 +19,7 @@ import {
   Settings2,
   ShieldCheck,
   Unplug,
+  Waypoints,
   Workflow,
   X,
 } from 'lucide-react';
@@ -29,10 +30,12 @@ import { ErrorNote, EvidenceCard, NovaMark, Pill, Result, Spinner } from './ui';
 import { CompareView } from './Compare';
 import { Connections, Registry } from './Settings';
 import { IteropWorkspace } from './IteropWorkspace';
+import { OrchestratorView } from './Orchestrator';
 
-type View = 'process' | 'missions' | 'compare' | 'connections' | 'registry';
+type View = 'process' | 'orchestrate' | 'missions' | 'compare' | 'connections' | 'registry';
 const nav = [
   { id: 'process', label: 'Business Process', icon: Workflow },
+  { id: 'orchestrate', label: 'Orchestration', icon: Waypoints },
   { id: 'connections', label: 'Connections', icon: Unplug },
   { id: 'missions', label: 'Mission control', icon: MessageSquare },
 ] as const;
@@ -44,6 +47,7 @@ const laterNav = [
 const icons = [Search, Box, GitCompareArrows, BookOpen, ShieldCheck];
 const viewNames: Record<View, string> = {
   process: 'Business Process',
+  orchestrate: 'Orchestration',
   missions: 'Mission control',
   compare: 'AURA comparison',
   connections: 'Connections',
@@ -168,7 +172,7 @@ export default function App() {
     inputRef.current?.focus();
   };
   const iteropView = view === 'process';
-  const currentSource = iteropView ? iteropSource : source;
+  const currentSource = view === 'orchestrate' ? 'synthetic' : iteropView ? iteropSource : source;
   const currentReady = iteropView ? status?.apps?.ITEROP?.liveReady : status?.liveReady;
   return (
     <div className="app-shell">
@@ -317,7 +321,8 @@ export default function App() {
             </button>
           </div>
         </header>
-        <main id="main-content" className={iteropView ? 'main-gen7' : ''}>
+        <main id="main-content" className={iteropView || view === 'orchestrate' ? 'main-gen7' : ''}>
+          {view === 'orchestrate' && <OrchestratorView />}
           {iteropView && (
             <IteropWorkspace
               status={status}

@@ -3,7 +3,9 @@
   "app": "ITEROP",
   "release": "REPLACE_WITH_DEPLOYED_RELEASE",
   "specRelease": "R2026x-FD04",
-  "apiVersion": "REPLACE_WITH_DOCUMENTED_API_VERSION",
+  "specSha256": "90212fe7b2a1740e39952178faa06422d177c71ff65e7ddb3ce908d294f6326e",
+  "apiVersion": "2.0.0",
+  "taskStartDateUnit": "unverified",
   "authenticationVerified": false,
   "authMode": "basic",
   "securityContext": "NOT_REQUIRED",
@@ -12,5 +14,5 @@
   "basePath": "",
   "probe": { "operation": "iterop.list_my_tasks" },
   "operations": {},
-  "templateNote": "INTENTIONALLY BLOCKED. Bind only getAllStartableProcesses, getTasksByUser and getBasicProcessInfo after reviewing the R2026x-FD04 schemas and an approved credential (docs/CONNECTING-ITEROP.md). Paths come from NOVA's operation inventory, never from this file."
+  "templateNote": "INTENTIONALLY BLOCKED. Bind only getAllStartableProcesses, getTasksByUser and getBasicProcessInfo after the administrator confirms the route, base path and authentication (docs/iterop/ACCESS-REQUEST.md). Paths and field mappings come from NOVA's FD04-verified inventory, never from this file. Set taskStartDateUnit only after the first live read proves it."
 }

@@ -12,7 +12,7 @@ import { SPEC, operation } from './operations';
 export type IteropRoute = {
   intent: AppIntent | 'unknown' | 'blocked' | 'other_user';
   view?: 'all' | 'next' | 'overdue';
-  sort?: 'due' | 'priority';
+  sort?: 'waiting' | 'priority';
   processKey?: string;
   taskId?: string;
 };
@@ -60,13 +60,14 @@ export function routeIterop(prompt: string): IteropRoute {
   )
     return {
       intent: 'process.my_tasks',
-      view: /\b(overdue|late|past due|en retard)\b/.test(p)
+      view: /\b(overdue|late|past due|due date|deadline|en retard|échéance)\b/.test(p)
         ? 'overdue'
-        : /\b(first|next|priorit\w*|d'abord|en premier)\b/.test(p) &&
-            /\b(work|travaill|should|dois)/.test(p)
+        : (/\b(first|next|d'abord|en premier)\b/.test(p) &&
+              /\b(work|travaill|should|dois)/.test(p)) ||
+            /\b(waiting|longest|oldest|attend\w*)\b/.test(p)
           ? 'next'
           : 'all',
-      sort: /priorit/.test(p) && !/\b(due|deadline|échéance)\b/.test(p) ? 'priority' : 'due',
+      sort: /priorit/.test(p) ? 'priority' : 'waiting',
     };
   if (
     /\b(explain|describe|summary|summarize|basic info\w*|information|what is|what's|tell me about|explique|décris|résumé|qu'est-ce)\b/.test(
@@ -78,10 +79,25 @@ export function routeIterop(prompt: string): IteropRoute {
   return { intent: 'unknown' };
 }
 
-const priorityRank: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+const num = (e: Evidence, k: string) =>
+  typeof e.fields[k] === 'number' ? (e.fields[k] as number) : undefined;
+/** FD04 gives priority as int32 with no documented scale or direction. */
+const priorityText = (e: Evidence) =>
+  num(e, 'priority') === undefined
+    ? 'priority not returned'
+    : `priority value ${num(e, 'priority')}`;
+const waitingText = (e: Evidence) => {
+  const at = str(e, 'startedAt');
+  if (!at)
+    return num(e, 'startDate') === undefined
+      ? 'start date not returned'
+      : 'start date returned (unit to be confirmed)';
+  const days = Math.floor((Date.now() - Date.parse(at)) / 86_400_000);
+  return days <= 0 ? 'started today' : `waiting ${days} ${days === 1 ? 'day' : 'days'}`;
+};
 const str = (e: Evidence, k: string) =>
   typeof e.fields[k] === 'string' ? (e.fields[k] as string) : undefined;
-const today = () => new Date().toISOString().slice(0, 10);
+const titleCaseFirst = (s: string) => s[0].toUpperCase() + s.slice(1);
 const words = (s: string) =>
   s
     .toLowerCase()
@@ -222,7 +238,7 @@ export async function runIteropMission(ctx: Ctx): Promise<Mission> {
           : 'The service returned no startable process for your identity. That is an answer, not an error.';
         mission.findings = r.records.map(
           (e) =>
-            `[${e.id}] ${e.title}${str(e, 'category') ? ` · ${str(e, 'category')}` : ''}${e.fields.version !== undefined ? ` · v${e.fields.version}` : ''}`,
+            `[${e.id}] ${e.title}${e.fields.version !== undefined ? ` · version ${e.fields.version}` : ''}`,
         );
         coverageNote(r);
         break;
@@ -230,15 +246,14 @@ export async function runIteropMission(ctx: Ctx): Promise<Mission> {
       case 'process.my_tasks':
       case 'process.task_attention': {
         const r = await call('iterop.list_my_tasks');
-        const now = today();
-        const sorted = [...r.records].sort((a, b) => {
-          const due = (str(a, 'dueDate') || '9999').localeCompare(str(b, 'dueDate') || '9999');
-          const pr =
-            (priorityRank[str(a, 'priority') || ''] ?? 9) -
-            (priorityRank[str(b, 'priority') || ''] ?? 9);
-          return route.sort === 'priority' ? pr || due : due || pr;
-        });
-        const overdue = sorted.filter((t) => (str(t, 'dueDate') || '9999') < now);
+        // startDate ordering is valid whatever its (undocumented) unit; missing values sort last.
+        const started = (t: Evidence) => num(t, 'startDate') ?? Number.MAX_SAFE_INTEGER;
+        const sorted = [...r.records].sort((a, b) =>
+          route.sort === 'priority'
+            ? (num(b, 'priority') ?? -Infinity) - (num(a, 'priority') ?? -Infinity) ||
+              started(a) - started(b)
+            : started(a) - started(b),
+        );
         if (route.intent === 'process.task_attention') {
           const byName = route.taskId ? undefined : matchProcess(prompt, sorted);
           if (byName?.candidates.length)
@@ -257,44 +272,41 @@ export async function runIteropMission(ctx: Ctx): Promise<Mission> {
               `NOVA can only explain tasks returned for your own identity. ${sorted.length} current tasks were returned and none matches.`,
             );
           mission.evidence = [t];
-          const due = str(t, 'dueDate');
           mission.title = `Why “${t.title}” needs your attention`;
-          mission.answer = `From its returned fields only: ${t.title}. NOVA reports declared values and does not infer a business cause.`;
+          mission.answer = `From its returned fields only: ${(str(t, 'description') || t.title).replace(/\.$/, '')}. NOVA reports returned values and does not infer a business cause; the task API returns no due date.`;
           mission.findings = [
-            `[${t.id}] Returned in your current task list.`,
-            due
-              ? `[${t.id}] Due ${due}${due < now ? ' — past due' : due === now ? ' — due today' : ''}.`
-              : `[${t.id}] No due date is declared.`,
-            `[${t.id}] Priority: ${str(t, 'priority') || 'not declared'}.`,
-            `[${t.id}] Part of ${str(t, 'processName') || str(t, 'processKey') || 'an undeclared process'}${str(t, 'processInstanceId') ? ` (instance ${str(t, 'processInstanceId')})` : ''}.`,
+            `[${t.id}] It is an active task waiting to be performed (returned by getTasksByUser).`,
+            `[${t.id}] ${titleCaseFirst(waitingText(t))}; position ${sorted.indexOf(t) + 1} of ${sorted.length} by waiting time.`,
+            `[${t.id}] ${titleCaseFirst(priorityText(t))} — FD04 does not document the scale.`,
+            `[${t.id}] Part of ${str(t, 'processName') || 'an unnamed process'}${str(t, 'processIdentificator') ? ` (“${str(t, 'processIdentificator')}”)` : ''}.`,
           ];
           break;
         }
-        const shown = route.view === 'overdue' ? overdue : sorted;
-        mission.evidence = shown;
-        if (route.view === 'next') {
+        mission.evidence = sorted;
+        if (route.view === 'overdue') {
+          mission.status = 'insufficient_evidence';
+          mission.title = 'Overdue status is not available';
+          mission.answer =
+            'The task API (getTasksByUser, R2026x-FD04) returns no due date, so NOVA cannot say which tasks are overdue. Your current tasks are listed by how long they have been waiting instead.';
+        } else if (route.view === 'next') {
           const first = sorted[0];
           mission.title = first ? `Start with ${first.title}` : 'You have no current tasks';
           mission.answer = first
-            ? `Ranked by due date, then priority — a transparent rule, not a judgement of business importance. ${overdue.length ? `${overdue.length} ${overdue.length === 1 ? 'task is' : 'tasks are'} past due.` : ''}`.trim()
+            ? 'Ranked by how long each task has been waiting — a transparent rule, not a judgement of business importance. The task API returns no due date, and its priority scale is undocumented.'
             : 'The service returned an empty task list for your identity.';
-        } else if (route.view === 'overdue') {
-          mission.title = overdue.length
-            ? `${overdue.length} overdue ${overdue.length === 1 ? 'task' : 'tasks'}`
-            : 'No overdue tasks';
-          const undated = sorted.filter((t) => !str(t, 'dueDate')).length;
-          mission.answer = `Compared with today (${now}).${undated ? ` ${undated} of your tasks ${undated === 1 ? 'has' : 'have'} no declared due date and cannot be classified.` : ''}`;
         } else {
           mission.title = sorted.length
             ? `${sorted.length} current ${sorted.length === 1 ? 'task' : 'tasks'}`
             : 'You have no current tasks';
           mission.answer = sorted.length
-            ? `Sorted by ${route.sort === 'priority' ? 'priority, then due date' : 'due date, then priority'}.${overdue.length ? ` ${overdue.length} past due.` : ''}${sorted.some((t) => !str(t, 'dueDate')) ? ' Some have no declared due date.' : ''}`
+            ? route.sort === 'priority'
+              ? 'Sorted by returned priority value, highest first. FD04 does not document whether a higher value means more urgent.'
+              : 'Sorted by waiting time, longest first. The task API returns no due date.'
             : 'The service returned an empty task list for your identity. That is an answer, not an error.';
         }
-        mission.findings = shown.map(
+        mission.findings = sorted.map(
           (t, i) =>
-            `${route.view === 'next' ? `${i + 1}. ` : ''}[${t.id}] ${t.title} · ${str(t, 'priority') || 'priority not declared'} · ${str(t, 'dueDate') ? `due ${str(t, 'dueDate')}${str(t, 'dueDate')! < now ? ' (past due)' : ''}` : 'no due date declared'}`,
+            `${route.view === 'next' ? `${i + 1}. ` : ''}[${t.id}] ${t.title} · ${waitingText(t)} · ${priorityText(t)}${str(t, 'processName') ? ` · ${str(t, 'processName')}` : ''}`,
         );
         coverageNote(r);
         break;
@@ -335,7 +347,7 @@ export async function runIteropMission(ctx: Ctx): Promise<Mission> {
         mission.title = d.title;
         mission.answer = str(d, 'description') || 'The process returns no description.';
         mission.findings = [
-          `[${d.id}] Version ${d.fields.version ?? 'not declared'} · ${str(d, 'category') || 'category not declared'}`,
+          `[${d.id}] Version ${d.fields.version ?? 'not returned'}.`,
           `[${d.id}] Basic information only. Inputs, steps and variables need a separate reviewed operation.`,
         ];
         if (!str(d, 'description')) mission.status = 'insufficient_evidence';
@@ -398,7 +410,7 @@ export async function runIteropMission(ctx: Ctx): Promise<Mission> {
       return stop(
         'needs_input',
         'No process with that key',
-        `${error.message} Check the key; NOVA does not guess alternatives.`,
+        `${error.message} NOVA does not guess alternatives.`,
       );
     return stop(
       'blocked',

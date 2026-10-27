@@ -34,6 +34,13 @@ export default defineConfig({
       NOVA_CLIENT_SECRET: '',
       NOVA_SECURITY_CONTEXT: '',
       NOVA_MODEL_PROVIDER: 'none',
+      NOVA_LAB_GATEWAY_ORIGIN: '',
+      NOVA_LAB_API_KEY: '',
+      NOVA_LAB_AGENT_ID: '',
+      NOVA_LAB_AGENT_SECRET: '',
+      NOVA_LAB_CONTRACT_FILE: '',
+      NOVA_LAB_PLAY_ORIGIN: '',
+      NOVA_LAB_MCP_ENGINE: '',
     },
   },
 });

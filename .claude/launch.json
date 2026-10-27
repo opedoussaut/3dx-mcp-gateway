@@ -1,0 +1,35 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "twin-viewer",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "twin:view"],
+      "port": 8765
+    },
+    {
+      "name": "twin-story-change1",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "twin:view", "--", ".private/twin/story-change1.usda", "--baseline", ".private/twin/story-baseline.usda", "--port", "8771"],
+      "port": 8771
+    },
+    {
+      "name": "twin-story-change2",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "twin:view", "--", ".private/twin/story-change2.usda", "--baseline", ".private/twin/story-baseline.usda", "--port", "8772"],
+      "port": 8772
+    },
+    {
+      "name": "twin-ai-pass1",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "twin:view", "--", ".private/twin/story-ai-pass1.usda", "--baseline", ".private/twin/hall-b-as-built.usda", "--port", "8781"],
+      "port": 8781
+    },
+    {
+      "name": "twin-ai-pass2",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "twin:view", "--", ".private/twin/story-ai-pass2.usda", "--baseline", ".private/twin/hall-b-as-built.usda", "--port", "8782"],
+      "port": 8782
+    }
+  ]
+}

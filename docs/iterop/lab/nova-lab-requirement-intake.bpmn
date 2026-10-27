@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  NOVA orchestration lab — Candidate requirement intake (synthetic, neutral test process).
+  Task ids and names match server/iterop/chain.ts. Invented example content only.
+-->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+  id="Definitions_novaLabRequirementIntake"
+  targetNamespace="https://github.com/opedoussaut/3dx-mcp-gateway/lab"
+  exporter="NOVA lab" exporterVersion="1">
+  <bpmn:collaboration id="Collaboration_requirementIntake">
+    <bpmn:participant id="Participant_requirementIntake" name="NOVA lab — Candidate requirement intake" processRef="syn-requirement-intake" />
+  </bpmn:collaboration>
+  <bpmn:process id="syn-requirement-intake" name="NOVA lab — Candidate requirement intake" isExecutable="true">
+    <bpmn:documentation>Start form variables: start_statement (TEXT_AREA, 10-1000 characters), start_sourceReference (TEXT, max 300). Instance identificator: REQ-nnn, set by the caller.</bpmn:documentation>
+    <bpmn:laneSet id="LaneSet_requirementIntake">
+      <bpmn:lane id="Lane_req_operator" name="Operator (NOVA acts as you)">
+        <bpmn:flowNodeRef>start</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_req_reviewer" name="Engineering reviewer">
+        <bpmn:flowNodeRef>requirementReview</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>recorded</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="start" name="Candidate">
+      <bpmn:outgoing>Flow_start_review</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="requirementReview" name="Review candidate requirement">
+      <bpmn:documentation>Signature task, human only. Output variable: requirementReview_decision (SELECT Accept##Edit##Reject).</bpmn:documentation>
+      <bpmn:incoming>Flow_start_review</bpmn:incoming>
+      <bpmn:outgoing>Flow_review_end</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="recorded" name="Decision recorded">
+      <bpmn:incoming>Flow_review_end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_start_review" sourceRef="start" targetRef="requirementReview" />
+    <bpmn:sequenceFlow id="Flow_review_end" sourceRef="requirementReview" targetRef="recorded" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_requirementIntake">
+    <bpmndi:BPMNPlane id="Plane_requirementIntake" bpmnElement="Collaboration_requirementIntake">
+      <bpmndi:BPMNShape id="Participant_requirementIntake_di" bpmnElement="Participant_requirementIntake" isHorizontal="true">
+        <dc:Bounds x="120" y="60" width="600" height="300" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_req_operator_di" bpmnElement="Lane_req_operator" isHorizontal="true">
+        <dc:Bounds x="150" y="60" width="570" height="140" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_req_reviewer_di" bpmnElement="Lane_req_reviewer" isHorizontal="true">
+        <dc:Bounds x="150" y="200" width="570" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="start_di" bpmnElement="start">
+        <dc:Bounds x="210" y="112" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="200" y="155" width="56" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="requirementReview_di" bpmnElement="requirementReview">
+        <dc:Bounds x="370" y="240" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="recorded_di" bpmnElement="recorded">
+        <dc:Bounds x="600" y="262" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="574" y="305" width="88" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_start_review_di" bpmnElement="Flow_start_review">
+        <di:waypoint x="246" y="130" /><di:waypoint x="430" y="130" /><di:waypoint x="430" y="240" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_review_end_di" bpmnElement="Flow_review_end">
+        <di:waypoint x="490" y="280" /><di:waypoint x="600" y="280" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

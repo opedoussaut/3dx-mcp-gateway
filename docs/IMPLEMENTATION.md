@@ -2,6 +2,14 @@
 
 The v0.1 blueprint remains the architecture target. This implementation turns its first read-only slice into a runnable local application; it does not claim all blueprint components are complete.
 
+## Process orchestration lab — read and drive (branch `claude/iterop-orchestration-lab`, 8 October 2026)
+
+- `server/iterop/orchestrator.ts`: a deterministic natural-language orchestrator. It plans FD04 reads (`getAllStartableProcesses`, `getBasicProcessInfo`, `getTasksByUser`, `getTaskInstanceInformations`, `getInstanceInfo`), local tools and FD04 writes (`startProcess`, `completeTask`). Every write stops as **PREPARED — NOT SUBMITTED** until the operator approves it, or approves all writes of one run.
+- `server/iterop/simulator.ts`: an in-memory **synthetic** process engine. Its responses, documented errors (201 with no body, robot-only 400, signature 403, 404s) and request schemas mirror FD04. `server/iterop/drive.ts` holds the verified operation inventory and the operations that are never called.
+- `server/iterop/chain.ts` and `docs/iterop/lab/*.bpmn`: two neutral test processes, _Liquid cooling configuration chain_ (with reviewer rejection and rework loop) and _Candidate requirement intake_, importable as BPMN 2.0. `server/iterop/configurators.ts` holds **illustrative** tools; they produce no engineering values.
+- **Orchestration** view: command bar, chain canvas, per-call trace with request and response, approval card, simulated reviewer, and before/after diff. MCP adds 13 `lab_*` tools so a Claude client, signed in with the user's own account, drives the lab through the local NOVA server. The operator fixes the engine (`NOVA_LAB_MCP_ENGINE`), and sandbox writes are approved in the NOVA page by default (`NOVA_LAB_MCP_APPROVAL`); see `docs/iterop/CLAUDE-MCP.md`. Reviewer sign-off is never exposed to a model.
+- **No live drive transport exists.** `POST /api/lab/runs` refuses `source: live`. See `docs/iterop/LAB-ORCHESTRATION.md` for the sandbox-tenant route and its preconditions.
+
 ## NOVA-003 — ITEROP first (7 October 2026)
 
 - `server/iterop/`: a dedicated ITEROP connector with its own origin, credential, contract and probe. Its operation inventory holds the three R2026x-FD04 P0 operations: `getAllStartableProcesses`, `getTasksByUser` and `getBasicProcessInfo`. A contract can bind only those operationIds; paths come from the inventory.
@@ -22,7 +30,12 @@ The v0.1 blueprint remains the architecture target. This implementation turns it
   - Live is an explicit gate: no request is made and nothing falls back to synthetic data;
   - mobile uses a My tasks | Processes switch and stacked provenance cards;
   - AURA and the Tool registry sit under a secondary "Later" navigation group.
-- **LIVE: `BLOCKED`.** The FD04 schemas are pending (the file could not be retrieved), and no approved route or credential exists. See `docs/CONNECTING-ITEROP.md`.
+- **FD04 schema alignment (live-read readiness):**
+  - the official R2026x-FD04 OpenAPI has been parsed (SHA-256 verified);
+  - NOVA validates the three response bodies with schemas written for FD04 (`server/iterop/fd04.ts`);
+  - synthetic fixtures are FD04-shaped and go through the same projection as live responses;
+  - the UI no longer relies on fields FD04 does not return (due date, status, process key, step).
+- **LIVE: `BLOCKED`** on a sanctioned route and a read-only credential that acts as Olivier himself. See `docs/iterop/ACCESS-REQUEST.md` and `docs/iterop/FIRST-LIVE-TEST.md`.
 - Dataset Governance work is parked on the branch `claude/dataset-governance-parked`.
 
 ## Implemented

@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>Claude ⇄ ITEROP run</title>
+<style>
+  :root{--ink:#172b3d;--mid:#10283f;--muted:#5b6b7a;--blue:#1768a4;--teal:#0b6a6e;--amber:#9a5f17;--red:#b4322b;--line:#e3eaf0;--bg:#f5f8fa}
+  *{box-sizing:border-box}
+  body{margin:0;width:1280px;height:720px;overflow:hidden;background:var(--bg);font:14px/1.45 Inter,'Segoe UI',Roboto,Arial,sans-serif;color:var(--ink)}
+  header{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid var(--line);background:#fff}
+  header h1{margin:0;font-size:17px;font-weight:650;color:var(--mid);letter-spacing:-.01em}
+  header h1 span{color:var(--muted);font-weight:500}
+  .badges{display:flex;gap:8px}
+  .badge{font:600 11px/1 ui-monospace,Menlo,Consolas,monospace;padding:6px 8px;border-radius:6px;background:#eef3f7;color:#3d5468;letter-spacing:.04em}
+  .badge.sim{background:#fbf3e6;color:var(--amber)}
+  main{display:grid;grid-template-columns:1fr 470px;height:664px}
+  .col{overflow:hidden;position:relative;padding:16px 20px}
+  .col h2{margin:0 0 10px;font:700 11px/1 Inter,sans-serif;letter-spacing:.08em;color:var(--muted)}
+  .stream{display:flex;flex-direction:column;gap:10px;position:absolute;left:20px;right:20px;bottom:16px}
+  .tools{border-left:1px solid var(--line);background:#fbfcfd}
+  .msg{max-width:88%;padding:10px 14px;border-radius:14px;animation:in .35s ease-out}
+  .user{align-self:flex-end;background:var(--blue);color:#fff;border-bottom-right-radius:4px;font-weight:500}
+  .claude{align-self:flex-start;background:#fff;border:1px solid var(--line);border-bottom-left-radius:4px}
+  .claude b{display:block;font-size:11px;letter-spacing:.06em;color:var(--blue);margin-bottom:2px}
+  .engineer{align-self:center;background:#fbf3e6;border:1px solid #ecd3ae;color:#6d4510;font-weight:600;max-width:96%}
+  .note{align-self:stretch;max-width:none;background:#eef3f7;color:#3d5468;font-size:12.5px;border-radius:10px}
+  .call{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 11px;animation:in .3s ease-out}
+  .call .top{display:flex;justify-content:space-between;gap:8px;align-items:center}
+  .call code{font:600 12.5px ui-monospace,Menlo,Consolas,monospace;color:var(--mid)}
+  .tag{font:700 10px/1 ui-monospace,monospace;padding:4px 6px;border-radius:5px;letter-spacing:.05em}
+  .read{background:#e5f0f8;color:var(--blue)} .write{background:#fbeeee;color:var(--red)} .local{background:#e6f4f4;color:var(--teal)}
+  .call .res{margin-top:4px;font-size:12.5px;color:var(--ink)}
+  .call .args{margin-top:3px;font:11.5px ui-monospace,Menlo,Consolas,monospace;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .call.err{border-color:#efc4c0;background:#fdf6f5} .call.err .res{color:var(--red);font-weight:600}
+  .ok{color:var(--teal);font-weight:700}
+  .card{position:absolute;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:5;transition:opacity .6s}
+  .card .inner{width:860px}
+  .card h2{font-size:34px;letter-spacing:-.03em;margin:0 0 10px;color:var(--mid)}
+  .card p{font-size:17px;color:var(--muted);margin:6px 0}
+  .card ul{font-size:16px;line-height:1.7;margin:14px 0 0;padding-left:20px}
+  .hide{opacity:0;pointer-events:none}
+  @keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Claude ⇄ ITEROP <span>· claude-iterop-orchestrator MCP connector</span></h1>
+  <div class="badges"><span class="badge sim">SIMULATED ITEROP ENGINE</span><span class="badge" id="mode">REVIEW MODE: FINAL</span></div>
+</header>
+<main>
+  <section class="col"><h2>CONVERSATION — CLAUDE AND THE PEOPLE</h2><div class="stream" id="chat"></div></section>
+  <section class="col tools"><h2>MCP TOOL CALLS — REAL CONNECTOR RESULTS</h2><div class="stream" id="tools"></div></section>
+</main>
+<div class="card" id="title"><div class="inner">
+  <h2>Claude drives an ITEROP business process</h2>
+  <p>Claude engineers a liquid-cooling configuration, an independent check verifies it, Claude runs the process steps, and an engineer signs off — with one rework loop.</p>
+  <ul>
+    <li><b>Real:</b> the connector code, its 9 MCP tools, the simulated ITEROP engine and every tool result shown on the right.</li>
+    <li><b>Scripted for this recording:</b> Claude’s chat lines and design values, and the engineer’s decisions (done in ITEROP Play in real life).</li>
+  </ul>
+</div></div>
+<div class="card hide" id="end"><div class="inner">
+  <h2>What the team just saw</h2>
+  <ul>
+    <li>Claude plans, designs and explains; the connector only exposes 9 fixed tools — no sign, delete, reassign, deploy or rights.</li>
+    <li>Claude’s design is verified by a deterministic check (energy balance, limits, redundancy); Claude cannot write its own “PASS”.</li>
+    <li>Writes are flagged; review mode (step / final) is set by the operator, not by Claude.</li>
+    <li>The engineer’s sign-off in ITEROP is the only thing that makes the result official; a rejection comes back as rework.</li>
+    <li>Same connector runs against the sandbox tenant through the API Gateway (ITEROP_MCP_ENGINE=live).</li>
+  </ul>
+</div></div>
+<script>
+const RUN = window.RUN || [];
+const chat = document.getElementById('chat'), tools = document.getElementById('tools');
+const kindOf = (t) => (/start_process|complete_task/.test(t) ? ['write','WRITE'] : t === 'cooling_check' ? ['local','CHECK'] : ['read','READ']);
+const short = (v) => typeof v === 'string' ? v : JSON.stringify(v);
+function summary(s) {
+  const r = s.result;
+  if (s.error) return '✗ ' + (r.error || 'refused');
+  switch (s.tool) {
+    case 'iterop_connection': return `✓ ${r.engine} · review mode ${r.reviewMode} · ${r.processes.length} processes`;
+    case 'iterop_get_process_model': return `✓ ${r.process.name}: ${r.startForm.length} start fields, ${r.tasks.length} tasks`;
+    case 'cooling_check': return `✓ ${r.result} · energy balance ${r.derived.expectedFlowLpm} L/min · utilisation ${r.derived.utilisationPct} %`;
+    case 'iterop_start_process': return `✓ started ${r.runReference} → next: ${r.nextTask.task}`;
+    case 'iterop_complete_task': return `✓ ${r.completed} → ${typeof r.nextTask === 'string' ? 'waits for a person (sign-off)' : 'next: ' + r.nextTask.task}`;
+    case 'iterop_list_my_tasks': return `✓ ${r.tasks.length} open task(s)${r.tasks.length ? ': ' + r.tasks.map((t) => t.task).join(', ') : ''}`;
+    case 'iterop_get_task': return `✓ ${r.task.name}`;
+    default: return '✓';
+  }
+}
+function args(s) {
+  const a = s.args || {};
+  if (a.values) return Object.entries(a.values).map(([k, v]) => `${k}=${short(v)}`).join('  ');
+  if (a.proposal) return Object.entries(a.proposal).map(([k, v]) => `${k.replace(/^[a-z]+[A-Z]?[a-z]*_/, '')}=${short(v)}`).join('  ');
+  return Object.entries(a).map(([k, v]) => `${k}=${short(v)}`).join('  ');
+}
+function add(el, parent, max) {
+  parent.appendChild(el);
+  while (parent.children.length > max) parent.removeChild(parent.firstChild);
+}
+function show(s) {
+  if (s.kind === 'call') {
+    const [cls, label] = kindOf(s.tool);
+    const d = document.createElement('div');
+    d.className = 'call' + (s.error ? ' err' : '');
+    d.innerHTML = `<div class="top"><code>${s.tool}</code><span class="tag ${cls}">${label}</span></div><div class="res"></div><div class="args"></div>`;
+    d.querySelector('.res').textContent = summary(s);
+    d.querySelector('.args').textContent = args(s);
+    add(d, tools, 9);
+  } else {
+    const d = document.createElement('div');
+    d.className = 'msg ' + s.kind;
+    if (s.kind === 'claude') d.innerHTML = '<b>CLAUDE</b>';
+    d.appendChild(document.createTextNode(s.text));
+    add(d, chat, 7);
+  }
+}
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const pace = (s) => s.kind === 'call' ? 1500 : s.kind === 'user' ? 2200 : Math.min(7000, Math.max(2600, s.text.length * 38));
+(async () => {
+  await wait(6500);
+  document.getElementById('title').classList.add('hide');
+  await wait(600);
+  for (const s of RUN) { show(s); await wait(pace(s)); }
+  await wait(1500);
+  document.getElementById('end').classList.remove('hide');
+  await wait(8000);
+  window.DONE = true;
+})();
+</script>
+</body>
+</html>

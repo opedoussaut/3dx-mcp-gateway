@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -8,7 +9,10 @@ import type { ToolName } from '../shared/types';
 import { IteropConnector } from './iterop/connector';
 import { iteropStatus, loadIteropConfig } from './iterop/config';
 import { operations, SPEC } from './iterop/operations';
+import { labBaseUrl, registerLabTools } from './mcp-lab';
 
+// Claude clients may start this server from any folder: work from the repository root.
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 if (existsSync('.env')) process.loadEnvFile('.env');
 const config = loadConfig();
 const gateway = new Gateway(config);
@@ -113,4 +117,10 @@ for (const { op, tool } of appTools) {
     },
   );
 }
+// Process orchestration lab: Claude drives it through the local NOVA server, which owns the
+// engines and the approval gates. The engine is the operator's choice, never the model's.
+registerLabTools(server, {
+  base: labBaseUrl(),
+  engine: process.env.NOVA_LAB_MCP_ENGINE === 'live' ? 'live' : 'synthetic',
+});
 await server.connect(new StdioServerTransport());

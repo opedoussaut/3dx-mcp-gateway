@@ -1,17 +1,20 @@
+import type { z } from 'zod';
+import { basicProcessInfo, startableProcessesList, tasksByUser } from './fd04';
+
 /**
- * ITEROP Business Process API v2 — operation inventory used by NOVA.
+ * ITEROP Business Process API v2 — the three P0 read operations NOVA may call.
  *
- * Source of record: R2026x-FD04 `businessprocess_v2.openapi.json` (link only, see
- * docs/references/ITEROP-R2026x-FD04-OPENAPI.md). The operationId, method and path below are
- * those recorded on `main` from that release document. Request/response schemas, status codes
- * and the security scheme are NOT yet verified here: the specification could not be retrieved
- * in the development session (egress denied). Field mapping therefore lives only in a reviewed
- * private contract; NOVA's own fields are a normalized projection, not the vendor schema.
+ * Verified against the official R2026x-FD04 `businessprocess_v2.openapi.json` (OpenAPI 3.1.0,
+ * info.version 2.0.0, 50 paths, 78 operations). The vendor document is kept privately in
+ * `.private/` and is never committed; `npm run iterop:openapi` re-resolves these contracts.
  */
 export const SPEC = {
   release: 'R2026x-FD04',
   document: 'businessprocess_v2.openapi.json',
+  openapi: '3.1.0',
   apiVersion: '2.0.0',
+  sha256: '90212fe7b2a1740e39952178faa06422d177c71ff65e7ddb3ce908d294f6326e',
+  security: 'BasicAuth (http, scheme basic) — declared globally; no operation overrides it',
 } as const;
 
 export type SemanticOperation =
@@ -25,18 +28,20 @@ export type OperationSpec = {
   path: string;
   recordKind: 'process.definition' | 'process.task';
   description: string;
-  /** Query parameters NOVA must never send for this operation. */
+  /** Documented query parameters NOVA never sends. */
   forbiddenQuery: readonly string[];
-  /** Normalized, allowlisted fields. Anything else in an upstream row is dropped. */
-  fields: readonly string[];
+  /** FD04 200 response schema (NOVA validator). */
+  response: z.ZodType;
+  /** Where rows sit in the 200 body: a property, the root array, or the root object. */
+  rows: { kind: 'property'; property: string } | { kind: 'array' } | { kind: 'object' };
+  /** NOVA normalized field ← FD04 property path. Nothing else survives projection. */
+  mapping: Readonly<Record<string, string>>;
   required: readonly string[];
   shape: 'list' | 'detail';
+  /** Status codes documented by FD04 for this operation. */
+  documentedStatus: readonly number[];
   scope: string;
-  verification: { inventory: 'RECORDED_FROM_SPEC'; schemas: 'PENDING_SPEC_FILE' };
 };
-
-const verification = { inventory: 'RECORDED_FROM_SPEC', schemas: 'PENDING_SPEC_FILE' } as const;
-const processFields = ['id', 'name', 'description', 'version', 'category'] as const;
 
 export const operations: readonly OperationSpec[] = [
   {
@@ -45,14 +50,16 @@ export const operations: readonly OperationSpec[] = [
     method: 'GET',
     path: '/repository/processes/startable/list',
     recordKind: 'process.definition',
-    description: 'Process definitions the authenticated human user can start.',
-    // The specification states that a human caller must not supply `login`.
+    description: 'All startable processes for the currently logged-in (human) user.',
+    // FD04: "If `login` query parameter is provided the permission won't be granted (access forbidden)".
     forbiddenQuery: ['login'],
-    fields: processFields,
+    response: startableProcessesList,
+    rows: { kind: 'property', property: 'responses' },
+    mapping: { id: 'key', name: 'name', version: 'version' },
     required: ['id', 'name'],
     shape: 'list',
-    scope: 'Authenticated principal (human); no login parameter',
-    verification,
+    documentedStatus: [200, 403],
+    scope: 'Currently logged-in human user; login is never sent',
   },
   {
     name: 'iterop.list_my_tasks',
@@ -60,25 +67,25 @@ export const operations: readonly OperationSpec[] = [
     method: 'GET',
     path: '/runtime/tasks',
     recordKind: 'process.task',
-    description: 'Current tasks of the authenticated principal only.',
-    // `user` would enumerate another person's tasks; no reviewed authorization model permits it.
-    forbiddenQuery: ['user', 'login'],
-    fields: [
-      'id',
-      'name',
-      'processKey',
-      'processName',
-      'processInstanceId',
-      'step',
-      'status',
-      'priority',
-      'dueDate',
-      'createdAt',
-    ],
+    description: 'Active tasks waiting to be performed — requested without the user parameter.',
+    // `user` would target another person; FD04 does not document its default. Never sent.
+    forbiddenQuery: ['user', 'login', 'processInstanceId'],
+    response: tasksByUser,
+    rows: { kind: 'array' },
+    mapping: {
+      id: 'id',
+      name: 'name',
+      description: 'description',
+      priority: 'priority',
+      startDate: 'startDate',
+      processName: 'process.name',
+      processInstanceId: 'process.instanceId',
+      processIdentificator: 'process.identificator',
+    },
     required: ['id', 'name'],
     shape: 'list',
-    scope: 'Self only; the user parameter is never sent',
-    verification,
+    documentedStatus: [200, 404],
+    scope: 'No user parameter sent; self-scope to be confirmed in the first live read',
   },
   {
     name: 'iterop.get_process_summary',
@@ -86,13 +93,21 @@ export const operations: readonly OperationSpec[] = [
     method: 'GET',
     path: '/repository/processes/{processKey}/basic',
     recordKind: 'process.definition',
-    description: 'Basic description and version of one named process.',
+    description: 'Basic and non-sensitive information about one process.',
     forbiddenQuery: ['login', 'user'],
-    fields: processFields,
+    response: basicProcessInfo,
+    rows: { kind: 'object' },
+    mapping: {
+      id: 'key',
+      name: 'name',
+      description: 'description',
+      version: 'version',
+      icon: 'icon',
+    },
     required: ['id', 'name'],
     shape: 'detail',
+    documentedStatus: [200, 404, 500],
     scope: 'One process key resolved from your startable list or typed exactly',
-    verification,
   },
 ];
 
