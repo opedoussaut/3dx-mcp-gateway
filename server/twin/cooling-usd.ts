@@ -31,23 +31,52 @@ const mm = (m: number) => `${Math.round(m * 1000)} mm`;
 /** Length of the hall's CDU gallery along the rows (illustrative lab room). */
 export const CDU_GALLERY_M = 4.2;
 const CDU_GAP_M = 0.1;
-/** Unit width from its capacity class: 500 kW class 0.8 m, larger classes 0.95 m (illustrative). */
 const capacityOf = (d: CoolingDesign) =>
   d.cduCapacityKw ?? Number(d.cduModel.match(/(\d{2,5})/)?.[1] ?? 0);
-export const cduWidth = (d: CoolingDesign) => (capacityOf(d) > 600 ? 0.95 : 0.8);
-/** Do the CDUs fit the gallery? The numbers can pass while the room cannot hold the units. */
-export function layoutCheck(d: CoolingDesign) {
-  const width = cduWidth(d);
-  const requiredM = Math.round((d.cduUnits * width + (d.cduUnits - 1) * CDU_GAP_M) * 100) / 100;
+/** In-row units stand in the rack row, not in the CDU gallery; the model name says so. */
+export const inRow = (d: CoolingDesign) => /in-?row|-IR-/i.test(d.cduModel);
+/** Unit width: in-row 0.6 m (a rack slot), 500 kW class 0.8 m, larger classes 0.95 m (illustrative). */
+export const cduWidth = (d: CoolingDesign) => (inRow(d) ? 0.6 : capacityOf(d) > 600 ? 0.95 : 0.8);
+const r2 = (n: number) => Math.round(n * 100) / 100;
+/**
+ * Do the CDUs fit the gallery? The numbers can pass while the room cannot hold the units. With
+ * `asBuilt`, `d` is a new zone added to that hall, and the gallery is shared with its units.
+ */
+export function layoutCheck(d: CoolingDesign, asBuilt?: CoolingDesign) {
+  const inGallery = (asBuilt ? [asBuilt, d] : [d]).filter((z) => !inRow(z));
+  const units = inGallery.reduce((n, z) => n + z.cduUnits, 0);
+  const requiredM = units
+    ? r2(inGallery.reduce((m, z) => m + z.cduUnits * cduWidth(z), 0) + (units - 1) * CDU_GAP_M)
+    : 0;
   const fits = requiredM <= CDU_GALLERY_M;
+  const over = `${r2(requiredM - CDU_GALLERY_M)} m too long`;
+  const rowNote = inRow(d) ? ` The ${d.cduUnits} new in-row CDUs stand in the new rack row.` : '';
+  const finding = !asBuilt
+    ? inRow(d)
+      ? `${d.cduUnits} in-row CDUs stand in the rack row; the CDU gallery is not used.`
+      : fits
+        ? `${d.cduUnits} CDUs need ${requiredM} m of the ${CDU_GALLERY_M} m CDU gallery.`
+        : `${d.cduUnits} CDUs need ${requiredM} m but the CDU gallery is ${CDU_GALLERY_M} m: ${over}.`
+    : fits
+      ? `The CDU gallery holds ${units} CDUs: ${requiredM} of ${CDU_GALLERY_M} m.${rowNote}`
+      : `${asBuilt.cduUnits} existing and ${d.cduUnits} new CDUs need ${requiredM} m but the CDU gallery is ${CDU_GALLERY_M} m: ${over}.`;
   return {
     result: fits ? ('PASS' as const) : ('FAIL' as const),
     requiredM,
     availableM: CDU_GALLERY_M,
-    finding: fits
-      ? `${d.cduUnits} CDUs need ${requiredM} m of the ${CDU_GALLERY_M} m CDU gallery.`
-      : `${d.cduUnits} CDUs need ${requiredM} m but the CDU gallery is ${CDU_GALLERY_M} m: ${Math.round((requiredM - CDU_GALLERY_M) * 100) / 100} m too long.`,
+    finding,
   };
+}
+/** What a new zone adds to an as-built hall, in plain words. */
+export function extensionDiff(asBuilt: CoolingDesign, zone: CoolingDesign): string[] {
+  const perRack = (d: CoolingDesign) => Math.round((d.itLoadKw / d.rackCount) * 10) / 10;
+  return [
+    `existing zone unchanged: ${asBuilt.rackCount} racks, ${asBuilt.itLoadKw} kW, ${asBuilt.cduUnits} × ${asBuilt.cduModel}`,
+    `new zone: ${zone.rackCount} racks, ${zone.itLoadKw} kW (${perRack(zone)} kW per rack, ${perRack(asBuilt)} kW in the existing zone)`,
+    `new CDUs: ${zone.cduUnits} × ${zone.cduModel} (${zone.cduDutyUnits} duty), ${inRow(zone) ? 'in-row, in the new rack row' : 'in the CDU gallery'}`,
+    `new secondary loop: ${zone.supplyC} → ${zone.returnC} °C, ${zone.flowLpm} L/min, ${zone.rackFlowLpm} L/min per rack`,
+    `hall IT load ${asBuilt.itLoadKw} → ${asBuilt.itLoadKw + zone.itLoadKw} kW`,
+  ];
 }
 /** Pipe inner diameters that follow from a design (as drawn in the scene). */
 export function pipeSizes(d: CoolingDesign) {
@@ -115,6 +144,7 @@ const v3 = (v: V3) => `(${v.map(r3).join(', ')})`;
 const LOOKS: Record<string, V3> = {
   Floor: [0.55, 0.57, 0.6],
   Rack: [0.12, 0.13, 0.15],
+  RackDense: [0.1, 0.17, 0.34],
   CduDuty: [0.04, 0.42, 0.43],
   CduStandby: [0.45, 0.6, 0.62],
   Supply: [0.09, 0.41, 0.64],
@@ -124,7 +154,14 @@ const LOOKS: Record<string, V3> = {
   Clash: [0.85, 0.12, 0.1],
 };
 
-export function coolingUsd(d: CoolingDesign) {
+/**
+ * With `hall`, the scene is the as-built hall plus `design` as a new zone: the existing equipment
+ * keeps exactly the prim paths and values of its own scene, so a viewer comparison shows only what
+ * the new zone adds.
+ */
+export function coolingUsd(design: CoolingDesign, hall?: { name: string; asBuilt: CoolingDesign }) {
+  const d = hall ? hall.asBuilt : design;
+  const ext = hall ? design : undefined;
   const out: string[] = [];
   const indent = (n: number) => '    '.repeat(n);
   const attrs = (n: number, a: Record<string, string | number>) =>
@@ -279,6 +316,25 @@ export function coolingUsd(d: CoolingDesign) {
   const deltaK = d.returnC - d.supplyC;
   const facilityLpm = (d.itLoadKw / (4.18 * 0.997 * deltaK)) * 60;
   const facilityDia = diameter(facilityLpm / d.cduDutyUnits);
+  const hallSpace = ext ? layoutCheck(ext, d) : space;
+
+  // A new zone: its rack row(s) continue the existing rows, with its own secondary loop above the
+  // existing one. In-row units stand at the start of its first row; gallery units follow the
+  // existing ones and run past the gallery's end when it is full.
+  const extRows = ext ? (ext.rackCount > 12 ? 2 : 1) : 0;
+  const extPerRow = ext ? Math.ceil(ext.rackCount / extRows) : 0;
+  const extInRow = ext ? inRow(ext) : false;
+  const extUnitW = ext ? cduWidth(ext) : 0;
+  const extX0 = rowEnd + 1.2;
+  const extRackX0 = extX0 + (ext && extInRow ? ext.cduUnits * extUnitW : 0);
+  const extEnd = extRackX0 + extPerRow * RACK.w;
+  const extGalleryY = (i: number) =>
+    cduY(d.cduUnits - 1) + unitW / 2 + CDU_GAP_M + extUnitW / 2 + i * (extUnitW + CDU_GAP_M);
+  const extOutside = (i: number) => extGalleryY(i) + extUnitW / 2 > galleryEnd + 1e-6;
+  const extUnitAt = (i: number): V3 =>
+    extInRow
+      ? [extX0 + i * extUnitW + extUnitW / 2, rowY(0), CDU.h / 2]
+      : [cduX, extGalleryY(i), CDU.h / 2];
 
   out.push(
     '#usda 1.0',
@@ -286,7 +342,7 @@ export function coolingUsd(d: CoolingDesign) {
     '    defaultPrim = "CoolingSystem"',
     '    metersPerUnit = 1',
     '    upAxis = "Z"',
-    `    doc = ${str(`NOVA lab: liquid cooling configuration${d.runReference ? ` ${d.runReference}` : ''}. Synthetic schematic geometry generated from the checked design; values are illustrative lab values.`)}`,
+    `    doc = ${str(`NOVA lab: liquid cooling configuration${design.runReference ? ` ${design.runReference}` : ''}${hall ? `, new zone in ${hall.name} as built` : ''}. Synthetic schematic geometry generated from the checked design; values are illustrative lab values.`)}`,
     ')',
     '',
     'def Xform "CoolingSystem" (',
@@ -296,22 +352,23 @@ export function coolingUsd(d: CoolingDesign) {
     '{',
     ...attrs(1, {
       source: 'synthetic',
-      runReference: d.runReference ?? '',
-      itLoadKw: d.itLoadKw,
+      runReference: design.runReference ?? '',
+      ...(hall ? { hall: hall.name, asBuiltRun: d.runReference ?? '' } : {}),
+      itLoadKw: d.itLoadKw + (ext?.itLoadKw ?? 0),
       coolant: d.coolant,
       supplyC: d.supplyC,
       returnC: d.returnC,
       flowLpm: d.flowLpm,
       facilityWaterC: d.facilityWaterC,
       ...(d.sysml?.system ? { sysmlElementId: d.sysml.system } : {}),
-      ...(d.baseline
+      ...(design.baseline
         ? {
-            baselineRun: d.baseline.runReference,
-            changes: d.baseline.changes.join('; ') || 'no change',
+            baselineRun: design.baseline.runReference,
+            changes: design.baseline.changes.join('; ') || 'no change',
           }
         : {}),
-      spaceCheck: space.result,
-      spaceFinding: space.finding,
+      spaceCheck: hallSpace.result,
+      spaceFinding: hallSpace.finding,
     }),
     '',
     '    def Scope "Looks"',
@@ -326,7 +383,7 @@ export function coolingUsd(d: CoolingDesign) {
       '            {',
       '                uniform token info:id = "UsdPreviewSurface"',
       `                color3f inputs:diffuseColor = ${v3(c)}`,
-      `                float inputs:metallic = ${name.startsWith('Cdu') || name === 'Rack' ? 0.4 : name === 'Floor' ? 0 : 0.6}`,
+      `                float inputs:metallic = ${name.startsWith('Cdu') || name.startsWith('Rack') ? 0.4 : name === 'Floor' ? 0 : 0.6}`,
       `                float inputs:roughness = ${name === 'Floor' ? 0.9 : 0.35}`,
       ...(name === 'Gallery' ? ['                float inputs:opacity = 0.45'] : []),
       '                token outputs:surface',
@@ -336,9 +393,15 @@ export function coolingUsd(d: CoolingDesign) {
   out.push('    }', '');
 
   const minX = cduX - CDU.d / 2 - 1.6;
-  const maxX = rowEnd + 1.0;
+  const maxX = (ext ? extEnd : rowEnd) + 1.0;
   const minY = Math.min(spanY[0], galleryStart) - 1.2;
-  const maxY = Math.max(spanY[1], galleryEnd, cduY(d.cduUnits - 1) + unitW / 2) + 1.2;
+  const maxY =
+    Math.max(
+      spanY[1],
+      galleryEnd,
+      cduY(d.cduUnits - 1) + unitW / 2,
+      ext && !extInRow ? extGalleryY(ext.cduUnits - 1) + extUnitW / 2 : -Infinity,
+    ) + 1.2;
   out.push(
     ...box(
       1,
@@ -376,7 +439,7 @@ export function coolingUsd(d: CoolingDesign) {
       [CDU.d + 0.4, CDU_GALLERY_M, 0.02],
       [cduX, galleryMid, 0.012],
       'Gallery',
-      { lengthM: CDU_GALLERY_M, requiredM: space.requiredM, spaceCheck: space.result },
+      { lengthM: CDU_GALLERY_M, requiredM: hallSpace.requiredM, spaceCheck: hallSpace.result },
       'CDU gallery',
     ),
     '',
@@ -492,8 +555,243 @@ export function coolingUsd(d: CoolingDesign) {
       'Facility',
     ),
     '    }',
-    '}',
-    '',
   );
+  if (ext) out.push('', ...extension(ext));
+  out.push('}', '');
   return out.join('\n');
+
+  function extension(z: CoolingDesign) {
+    const p: string[] = [
+      '    def Xform "Extension" (',
+      `        displayName = ${str(`New zone${z.runReference ? ` ${z.runReference}` : ''}`)}`,
+      '    )',
+      '    {',
+      ...attrs(2, {
+        runReference: z.runReference ?? '',
+        itLoadKw: z.itLoadKw,
+        rackCount: z.rackCount,
+        coolant: z.coolant,
+        supplyC: z.supplyC,
+        returnC: z.returnC,
+        flowLpm: z.flowLpm,
+        cduPlacement: extInRow ? 'in-row' : 'CDU gallery',
+        ...(z.sysml?.system ? { sysmlElementId: z.sysml.system } : {}),
+      }),
+      '        def Xform "Racks"',
+      '        {',
+    ];
+    const rackKw = z.itLoadKw / z.rackCount;
+    const dense = rackKw > 1.2 * (d.itLoadKw / d.rackCount);
+    const rackAt = (i: number): [number, number] => [
+      extRackX0 + (i % extPerRow) * RACK.w + RACK.w / 2,
+      rowY(Math.floor(i / extPerRow)),
+    ];
+    for (let i = 0; i < z.rackCount; i++) {
+      const [x, y] = rackAt(i);
+      p.push(
+        ...box(
+          3,
+          `Rack_${String(i + 1).padStart(2, '0')}`,
+          [RACK.w * 0.96, RACK.d, RACK.h],
+          [x, y, RACK.h / 2],
+          dense ? 'RackDense' : 'Rack',
+          { heatLoadKw: rackKw, flowLpm: z.rackFlowLpm },
+          `New rack ${i + 1} (${Math.round(rackKw)} kW)`,
+        ),
+      );
+    }
+    p.push('        }', '        def Xform "CoolantDistributionUnits"', '        {');
+    for (let i = 0; i < z.cduUnits; i++) {
+      const duty = i < z.cduDutyUnits;
+      const clash = !extInRow && extOutside(i);
+      p.push(
+        ...box(
+          3,
+          `CDU_${i + 1}`,
+          extInRow ? [extUnitW * 0.96, RACK.d, CDU.h] : [CDU.d, extUnitW * 0.96, CDU.h],
+          extUnitAt(i),
+          clash ? 'Clash' : duty ? 'CduDuty' : 'CduStandby',
+          {
+            model: z.cduModel,
+            role: duty ? 'duty' : 'standby',
+            placement: extInRow ? 'in-row' : 'CDU gallery',
+            ...(clash ? { clash: 'outside the CDU gallery' } : {}),
+            ...(z.cduCapacityKw ? { capacityKw: z.cduCapacityKw } : {}),
+          },
+          `${z.cduModel} ${i + 1} (${duty ? 'duty' : 'standby'}, new zone)`,
+        ),
+      );
+    }
+    p.push('        }');
+
+    // Its own secondary loop, one level above the existing one.
+    const mainDiaZ = diameter(z.flowLpm);
+    const rowDiaZ = diameter(z.flowLpm / extRows);
+    const unitDiaZ = diameter(z.flowLpm / z.cduDutyUnits);
+    const rackDiaZ = diameter(z.rackFlowLpm);
+    const galleryRiserX = -0.85;
+    for (const kind of ['Supply', 'Return'] as const) {
+      const zz = RACK.h + (kind === 'Supply' ? 0.95 : 1.25);
+      const yo = kind === 'Supply' ? -0.2 : 0.2;
+      p.push(
+        `        def Xform ${str(`Secondary${kind}`)}`,
+        '        {',
+        ...attrs(3, {
+          temperatureC: kind === 'Supply' ? z.supplyC : z.returnC,
+          flowLpm: z.flowLpm,
+          coolant: z.coolant,
+        }),
+      );
+      const headerFrom = extInRow ? extX0 : galleryRiserX;
+      for (let i = 0; i < z.cduUnits; i++) {
+        const [ux, uy] = extUnitAt(i);
+        if (extInRow) {
+          const x = ux + (kind === 'Supply' ? -0.1 : 0.1);
+          p.push(
+            ...pipe(
+              3,
+              `Unit_${i + 1}_Riser`,
+              [x, uy + yo, CDU.h],
+              [x, uy + yo, zz],
+              unitDiaZ,
+              kind,
+            ),
+          );
+        } else {
+          const y = uy + (kind === 'Return' ? 0.15 : -0.15);
+          p.push(
+            ...pipe(
+              3,
+              `Unit_${i + 1}_Out`,
+              [cduX + CDU.d / 2, y, CDU.h - 0.2],
+              [galleryRiserX, y, CDU.h - 0.2],
+              unitDiaZ,
+              kind,
+            ),
+            ...pipe(
+              3,
+              `Unit_${i + 1}_Riser`,
+              [galleryRiserX, y, CDU.h - 0.2],
+              [galleryRiserX, y, zz],
+              unitDiaZ,
+              kind,
+            ),
+          );
+        }
+      }
+      // Distribution along the gallery (or across the rows) to the row headers.
+      const ys = [
+        ...Array.from({ length: extRows }, (_, r) => rowY(r) + yo),
+        ...(extInRow
+          ? []
+          : Array.from(
+              { length: z.cduUnits },
+              (_, i) => extGalleryY(i) + (kind === 'Return' ? 0.15 : -0.15),
+            )),
+      ];
+      const [y0, y1] = [Math.min(...ys), Math.max(...ys)];
+      if (y1 - y0 > 1e-6)
+        p.push(
+          ...pipe(3, 'Distribution', [headerFrom, y0, zz], [headerFrom, y1, zz], mainDiaZ, kind),
+        );
+      for (let r = 0; r < extRows; r++) {
+        const y = rowY(r) + yo;
+        p.push(
+          ...pipe(3, `Row_${r + 1}_Header`, [headerFrom, y, zz], [extEnd, y, zz], rowDiaZ, kind, {
+            flowLpm: z.flowLpm / extRows,
+          }),
+        );
+      }
+      for (let i = 0; i < z.rackCount; i++) {
+        const [x, y] = rackAt(i);
+        const xx = x + (kind === 'Supply' ? -0.1 : 0.1);
+        p.push(
+          ...pipe(
+            3,
+            `Rack_${String(i + 1).padStart(2, '0')}_Drop`,
+            [xx, y + yo, zz],
+            [xx, y + yo, RACK.h],
+            rackDiaZ,
+            kind,
+            { flowLpm: z.rackFlowLpm },
+          ),
+        );
+      }
+      p.push('        }');
+    }
+
+    // Facility water to the new units: along the wall to gallery units, or to the in-row units
+    // along the back of the first row.
+    const deltaZ = z.returnC - z.supplyC;
+    const facilityZ = (z.itLoadKw / (4.18 * 0.997 * deltaZ)) * 60;
+    const fDia = diameter(facilityZ / z.cduDutyUnits);
+    const wallX = minX + 0.4;
+    p.push('        def Xform "FacilityWater"', '        {');
+    for (const [k, fz] of [
+      ['Supply', 0.35],
+      ['Return', 0.6],
+    ] as const) {
+      if (extInRow) {
+        const backY = rowY(0) - RACK.d / 2 - 0.25;
+        const lastX = extUnitAt(z.cduUnits - 1)[0];
+        p.push(
+          ...pipe(
+            3,
+            `Wall_Link_${k}`,
+            [wallX, spanY[0], fz],
+            [wallX, backY, fz],
+            diameter(facilityZ),
+            'Facility',
+          ),
+          ...pipe(
+            3,
+            `Header_${k}`,
+            [wallX, backY, fz],
+            [lastX, backY, fz],
+            diameter(facilityZ),
+            'Facility',
+          ),
+        );
+        for (let i = 0; i < z.cduUnits; i++) {
+          const ux = extUnitAt(i)[0] + (k === 'Supply' ? -0.1 : 0.1);
+          p.push(
+            ...pipe(
+              3,
+              `Unit_${i + 1}_${k}`,
+              [ux, backY, fz],
+              [ux, rowY(0) - RACK.d / 2, fz],
+              fDia,
+              'Facility',
+            ),
+          );
+        }
+      } else {
+        const lastY = extGalleryY(z.cduUnits - 1);
+        if (lastY > spanY[1])
+          p.push(
+            ...pipe(
+              3,
+              `Wall_Extension_${k}`,
+              [wallX, spanY[1], fz],
+              [wallX, lastY, fz],
+              diameter(facilityZ),
+              'Facility',
+            ),
+          );
+        for (let i = 0; i < z.cduUnits; i++)
+          p.push(
+            ...pipe(
+              3,
+              `Unit_${i + 1}_${k}`,
+              [wallX, extGalleryY(i), fz],
+              [cduX - CDU.d / 2, extGalleryY(i), fz],
+              fDia,
+              'Facility',
+            ),
+          );
+      }
+    }
+    p.push('        }', '    }');
+    return p;
+  }
 }

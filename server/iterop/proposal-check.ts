@@ -11,6 +11,8 @@ export type Envelope = {
   facilityWaterC: number;
   rackCount: number;
   redundancy: 'N' | 'N+1' | '2N';
+  /** Heat load of the densest rack when racks differ (for example AI racks); the average hides it. */
+  maxRackKw?: number;
 };
 export type Proposal = {
   coolantSelection_fluid: string;
@@ -90,6 +92,23 @@ export function checkProposal(e: Envelope, p: Proposal): CheckResult {
     fail.push(
       `Flow per rack ${p.loopConfiguration_rackFlowLpm} L/min exceeds ${LIMITS.maxRackFlowLpm} L/min.`,
     );
+  // Mixed densities: the densest rack needs its own flow at the loop's ΔT, whatever the average.
+  const averageRackKw = e.itLoadKw / e.rackCount;
+  const densestFlow =
+    e.maxRackKw && dT > 0
+      ? (e.maxRackKw / (p.coolantSelection_density * p.coolantSelection_cp * dT)) * 60_000
+      : NaN;
+  if (e.maxRackKw !== undefined) {
+    if (e.maxRackKw < averageRackKw - 1e-9)
+      review.push(
+        `Densest rack ${e.maxRackKw} kW is below the average of ${r1(averageRackKw)} kW per rack.`,
+      );
+    else if (densestFlow > LIMITS.maxRackFlowLpm)
+      fail.push(
+        `The densest racks (${e.maxRackKw} kW) need ${r1(densestFlow)} L/min each at ΔT ${r1(dT)} K, above the ${LIMITS.maxRackFlowLpm} L/min rack limit; the average of ${r1(perRack)} L/min hides them.`,
+      );
+    else ok.push(`Densest racks (${e.maxRackKw} kW) need ${r1(densestFlow)} L/min each.`);
+  }
 
   // CDUs: capacity, redundancy and utilisation.
   const duty = p.cduSizing_dutyUnits;
@@ -119,6 +138,7 @@ export function checkProposal(e: Envelope, p: Proposal): CheckResult {
       approachK: r1(approach),
       expectedFlowLpm: r1(expectedFlow),
       flowPerRackLpm: r1(perRack),
+      ...(e.maxRackKw !== undefined ? { densestRackFlowLpm: r1(densestFlow) } : {}),
       utilisationPct: r1(utilisation),
       expectedUnits,
     },

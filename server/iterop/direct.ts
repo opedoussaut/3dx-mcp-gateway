@@ -6,9 +6,15 @@ import { checkProposal, type Envelope, type Proposal } from './proposal-check';
 import { RunJournal, runContext } from './run-context';
 import { verifyReceipt } from '../cameo/receipt';
 import { createHash } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { coolingUsd, designDiff, layoutCheck, type CoolingDesign } from '../twin/cooling-usd';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, sep } from 'node:path';
+import {
+  coolingUsd,
+  designDiff,
+  extensionDiff,
+  layoutCheck,
+  type CoolingDesign,
+} from '../twin/cooling-usd';
 import { EngineError, type ProcessEngine } from './simulator';
 
 /**
@@ -314,6 +320,13 @@ export function registerDirectTools(server: McpServer, o: DirectOptions) {
           facilityWaterC: num.min(10).max(45),
           rackCount: z.number().int().min(1).max(500),
           redundancy: z.enum(['N', 'N+1', '2N']),
+          maxRackKw: num
+            .positive()
+            .max(500)
+            .optional()
+            .describe(
+              'Heat load of the densest rack, kW, when racks differ (for example AI racks next to standard ones). The check then verifies that rack’s own flow, which the average hides.',
+            ),
         }),
         proposal: z.object({
           coolantSelection_fluid: z.string().min(1).max(100),
@@ -395,6 +408,39 @@ export function registerDirectTools(server: McpServer, o: DirectOptions) {
       },
     };
   };
+  /**
+   * The as-built record of a hall: the equipment already installed, kept by the operator as a file
+   * in the twin folder (halls/<name>.json). Claude can read it through view3d_build, never write it.
+   */
+  const asBuiltSchema = z.object({
+    runReference: z.string().max(60).optional(),
+    itLoadKw: z.number().positive(),
+    rackCount: z.number().int().positive(),
+    coolant: z.string().min(1).max(60),
+    cduModel: z.string().min(1).max(100),
+    cduUnits: z.number().int().positive(),
+    cduDutyUnits: z.number().int().positive(),
+    cduCapacityKw: z.number().positive().optional(),
+    supplyC: z.number(),
+    returnC: z.number(),
+    flowLpm: z.number().positive(),
+    rackFlowLpm: z.number().positive(),
+    facilityWaterC: z.number(),
+  });
+  const readAsBuilt = (dir: string, hall: string) => {
+    const file = join(dir, 'halls', `${hall}.json`);
+    if (!existsSync(file))
+      return {
+        error: `No as-built record for ${hall}. The operator keeps it in ${file.split(sep).join('/')}; ask them, and never invent the existing equipment.`,
+      };
+    try {
+      const parsed = asBuiltSchema.safeParse(JSON.parse(readFileSync(file, 'utf8')));
+      if (!parsed.success) return { error: `The as-built record of ${hall} is incomplete.` };
+      return { design: parsed.data as CoolingDesign };
+    } catch {
+      return { error: `The as-built record of ${hall} is not valid JSON.` };
+    }
+  };
   const noRecord = (run: string, missing: string[]) =>
     text(
       {
@@ -418,6 +464,13 @@ export function registerDirectTools(server: McpServer, o: DirectOptions) {
           .regex(/^[A-Z]+-[0-9-]+$/)
           .optional()
           .describe('The approved run this configuration changes.'),
+        hall: z
+          .string()
+          .regex(/^[a-z0-9][a-z0-9-]{0,39}$/)
+          .optional()
+          .describe(
+            'For a new zone added next to existing equipment: the hall whose as-built record the operator keeps (for example hall-b). The scene then shows the existing equipment unchanged plus this run as the new zone, and the space check counts every unit in the shared CDU gallery.',
+          ),
       },
       annotations: {
         readOnlyHint: false,
@@ -426,13 +479,31 @@ export function registerDirectTools(server: McpServer, o: DirectOptions) {
         openWorldHint: false,
       },
     },
-    async ({ runReference, baselineRun }) => {
+    async ({ runReference, baselineRun, hall }) => {
       const now = recordedDesign(runReference);
       if ('missing' in now) return noRecord(runReference, now.missing);
       const dir = o.twinDir ?? '.private/twin';
       mkdirSync(dir, { recursive: true });
       let changes: string[] | undefined;
       let baselineFile: string | undefined;
+      let asBuilt: { name: string; asBuilt: CoolingDesign } | undefined;
+      if (hall && baselineRun)
+        return text(
+          {
+            engine: engineLabel,
+            error:
+              'Use baselineRun to change an approved run, or hall to add a new zone, not both.',
+          },
+          true,
+        );
+      if (hall) {
+        const record = readAsBuilt(dir, hall);
+        if ('error' in record) return text({ engine: engineLabel, error: record.error }, true);
+        asBuilt = { name: hall, asBuilt: record.design };
+        changes = extensionDiff(record.design, now.design);
+        baselineFile = join(dir, `${hall}-as-built.usda`);
+        writeFileSync(baselineFile, coolingUsd(record.design));
+      }
       if (baselineRun) {
         if (baselineRun === runReference)
           return text(
@@ -446,18 +517,24 @@ export function registerDirectTools(server: McpServer, o: DirectOptions) {
         writeFileSync(baselineFile, coolingUsd(base.design));
       }
       const d = now.design;
-      const usda = coolingUsd({
-        ...d,
-        ...(baselineRun ? { baseline: { runReference: baselineRun, changes: changes! } } : {}),
-      });
+      const baselineName = hall ? `${hall} as built` : baselineRun;
+      const usda = coolingUsd(
+        {
+          ...d,
+          ...(baselineName ? { baseline: { runReference: baselineName, changes: changes! } } : {}),
+        },
+        asBuilt,
+      );
       const file = join(dir, `${runReference}.usda`);
       writeFileSync(file, usda);
       const sha = createHash('sha256').update(usda).digest('hex').slice(0, 12);
       const at = (o.now ?? (() => new Date()))().toISOString().slice(0, 16).replace('T', ' ');
-      const space = layoutCheck(d);
-      const change = baselineRun
-        ? ` Change from baseline ${baselineRun}: ${changes!.length ? changes!.join('; ') : 'no change'}.`
-        : '';
+      const space = layoutCheck(d, asBuilt?.asBuilt);
+      const change = hall
+        ? ` New zone in ${hall} as built: ${changes!.join('; ')}.`
+        : baselineRun
+          ? ` Change from baseline ${baselineRun}: ${changes!.length ? changes!.join('; ') : 'no change'}.`
+          : '';
       const taskValues = {
         view3d_reference: `twin/${runReference}.usda`,
         view3d_revision: `sha256 ${sha} · generated ${at} UTC`,

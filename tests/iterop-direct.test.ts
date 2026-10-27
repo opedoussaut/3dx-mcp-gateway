@@ -557,3 +557,197 @@ test('the space check passes with fewer, larger units', async () => {
   assert.equal(larger.result, 'PASS');
   assert.equal(larger.requiredM, 4.1);
 });
+
+test('mixed rack densities: the densest rack is checked, not the average', async () => {
+  const { checkProposal } = await import('../server/iterop/proposal-check');
+  // 16 × 75 kW racks plus 8 × 130 kW AI racks on the existing 35 → 45 °C loop.
+  const oneLoop = checkProposal(
+    { itLoadKw: 2240, facilityWaterC: 32, rackCount: 24, redundancy: 'N+1', maxRackKw: 130 },
+    {
+      coolantSelection_fluid: 'PG25',
+      coolantSelection_cp: 3.9,
+      coolantSelection_density: 1020,
+      cduSizing_model: 'CDU-800',
+      cduCapacityKw: 800,
+      cduSizing_units: 5,
+      cduSizing_dutyUnits: 4,
+      cduSizing_utilisation: 70,
+      loopConfiguration_supplyC: 35,
+      loopConfiguration_returnC: 45,
+      loopConfiguration_flowLpm: 3379,
+      loopConfiguration_rackFlowLpm: 140.8,
+    },
+  );
+  assert.equal(oneLoop.result, 'FAIL');
+  assert.match(
+    oneLoop.findings.join(' '),
+    /densest racks \(130 kW\) need 196\.1 L\/min .* average of 140\.8/,
+  );
+});
+
+/** The AI zone of Hall B: a new run of the same process, next to the as-built equipment. */
+const AI_ZONE = { ...START, start_itLoadKw: 1040, start_rackCount: 8, start_coolant: 'PG25' };
+const aiProposal = (cdu: {
+  model: string;
+  capacity: number;
+  units: number;
+  duty: number;
+  util: number;
+}) => ({
+  coolantSelection_fluid: 'PG25',
+  coolantSelection_cp: 3.9,
+  coolantSelection_density: 1020,
+  cduSizing_model: cdu.model,
+  cduCapacityKw: cdu.capacity,
+  cduSizing_units: cdu.units,
+  cduSizing_dutyUnits: cdu.duty,
+  cduSizing_utilisation: cdu.util,
+  // A dedicated high-ΔT loop brings the 130 kW racks under the rack flow limit.
+  loopConfiguration_supplyC: 35,
+  loopConfiguration_returnC: 50,
+  loopConfiguration_flowLpm: 1046,
+  loopConfiguration_rackFlowLpm: 130.7,
+});
+
+test('the AI zone story: the 3D view rejects gallery CDUs, in-row units fit after the rework', async () => {
+  const { mkdirSync, writeFileSync } = await import('node:fs');
+  const { EXAMPLE } = await import('../server/twin/cooling-usd');
+  const dir = mkdtempSync(join(tmpdir(), 'nova-hall-'));
+  const engine = new SyntheticEngine();
+  const { call } = await connect({
+    engine,
+    processes: definitions.map((d) => d.key),
+    twinDir: dir,
+  });
+
+  const started = await call('iterop_start_process', {
+    processKey: 'syn-cooling-chain',
+    values: AI_ZONE,
+    runReference: 'COOL-261027-100000',
+  });
+  const envelope = {
+    itLoadKw: 1040,
+    facilityWaterC: 32,
+    rackCount: 8,
+    redundancy: 'N+1',
+    maxRackKw: 130,
+  };
+  const drive = async (
+    taskId: string,
+    proposal: ReturnType<typeof aiProposal>,
+    revision: string,
+  ) => {
+    const check = await call('cooling_check', { envelope, proposal });
+    assert.equal(check.result, 'PASS', JSON.stringify(check.findings));
+    const pick = (p: string) =>
+      Object.fromEntries(Object.entries(proposal).filter(([k]) => k.startsWith(p)));
+    let next = { taskId };
+    for (const values of [
+      {
+        ...pick('coolantSelection_'),
+        coolantSelection_rationale: 'PG25, as in the existing zone.',
+      },
+      pick('cduSizing_'),
+      pick('loopConfiguration_'),
+      check.checkTaskValues,
+      {
+        systemModel_reference: 'LAB-PROJECT/LiquidCoolingSystem',
+        systemModel_revision: revision,
+        systemModel_summary: 'AI zone: aiLoop and aiRack parts, requirement COOL-R6.',
+      },
+    ])
+      next = (await call('iterop_complete_task', { taskId: next.taskId, values })).nextTask;
+    return next;
+  };
+  let next = await drive(
+    started.nextTask.taskId,
+    aiProposal({ model: 'CDU-800', capacity: 800, units: 3, duty: 2, util: 65 }),
+    'r1',
+  );
+  // Without the operator's as-built record, the existing equipment is never invented.
+  const noRecord = await call('view3d_build', {
+    runReference: started.runReference,
+    hall: 'hall-b',
+  });
+  assert.equal(noRecord.isError, true);
+  assert.match(noRecord.error, /No as-built record for hall-b.*never invent/);
+
+  mkdirSync(join(dir, 'halls'));
+  writeFileSync(
+    join(dir, 'halls', 'hall-b.json'),
+    JSON.stringify({ ...EXAMPLE, runReference: 'COOL-261026-222827' }),
+  );
+  const both = await call('view3d_build', {
+    runReference: started.runReference,
+    hall: 'hall-b',
+    baselineRun: 'COOL-261026-222827',
+  });
+  assert.equal(both.isError, true);
+
+  // Pass 1: the new CDUs go to the shared gallery, which the existing four already fill.
+  const first = await call('view3d_build', { runReference: started.runReference, hall: 'hall-b' });
+  assert.equal(first.isError, undefined, JSON.stringify(first));
+  assert.equal(first.spaceCheck.result, 'FAIL');
+  assert.equal(
+    first.spaceCheck.finding,
+    '4 existing and 3 new CDUs need 6.65 m but the CDU gallery is 4.2 m: 2.45 m too long.',
+  );
+  assert.match(
+    first.taskValues.view3d_summary,
+    /New zone in hall-b as built: existing zone unchanged/,
+  );
+  assert.match(first.view, /--baseline .*hall-b-as-built\.usda/);
+  const usda1 = readFileSync(first.file, 'utf8');
+  assert.match(usda1, /def Xform "Extension"/);
+  assert.equal((usda1.match(/def Mesh "Rack_\d+"/g) ?? []).length, 16 + 8);
+  assert.equal((usda1.match(/nova:clash = "outside the CDU gallery"/g) ?? []).length, 3);
+  // The existing racks keep the paths and values of their own scene: a comparison shows only the new zone.
+  const asBuilt = readFileSync(join(dir, 'hall-b-as-built.usda'), 'utf8');
+  const racks = (s: string) =>
+    s.slice(s.indexOf('def Xform "Racks"'), s.indexOf('def Mesh "CDU_Gallery"'));
+  assert.equal(racks(usda1), racks(asBuilt));
+  next = (await call('iterop_complete_task', { taskId: next.taskId, values: first.taskValues }))
+    .nextTask;
+
+  // The engineer rejects; the rework moves the units into the AI rack row.
+  engine.signAsReviewer(
+    engine.reviewerQueue()[0].id,
+    'Reject',
+    'The AI zone CDUs do not fit the gallery. Use in-row units next to the AI racks.',
+  );
+  const [rework] = (await call('iterop_list_my_tasks')).tasks;
+  const revised = await call('iterop_complete_task', {
+    taskId: rework.taskId,
+    values: {
+      configurationRework_coolant: 'PG25',
+      configurationRework_redundancy: 'N+1',
+      configurationRework_facilityWaterC: 32,
+      configurationRework_note: 'In-row CDUs in the AI rack row, as the reviewer asked.',
+    },
+  });
+  next = await drive(
+    revised.nextTask.taskId,
+    aiProposal({
+      model: 'CDU-IR-400 (in-row, 400 kW class)',
+      capacity: 400,
+      units: 4,
+      duty: 3,
+      util: 86.7,
+    }),
+    'r2',
+  );
+  const second = await call('view3d_build', { runReference: started.runReference, hall: 'hall-b' });
+  assert.equal(second.spaceCheck.result, 'PASS');
+  assert.equal(
+    second.spaceCheck.finding,
+    'The CDU gallery holds 4 CDUs: 3.5 of 4.2 m. The 4 new in-row CDUs stand in the new rack row.',
+  );
+  const usda2 = readFileSync(second.file, 'utf8');
+  assert.doesNotMatch(usda2, /nova:clash/);
+  assert.equal((usda2.match(/nova:placement = "in-row"/g) ?? []).length, 4);
+  const shown = await call('iterop_complete_task', {
+    taskId: next.taskId,
+    values: second.taskValues,
+  });
+  assert.equal(shown.isError, undefined, JSON.stringify(shown));
+});

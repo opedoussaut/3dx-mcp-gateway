@@ -40,11 +40,12 @@ A note on implicit shapes: Blender 5.2 imports material bindings on explicit mes
 
 - **Space check.** The generator checks whether the CDUs fit the hall's CDU gallery (4.2 m, an illustrative room). The gallery is drawn on the floor in yellow, and units outside it are red, with `nova:clash`. The result is stored as `nova:spaceCheck` and `nova:spaceFinding` on the root, and written into the *Update 3D view* summary. The heat balance can pass while the room can't hold the units: that's what this check catches.
 - **Baseline.** `view3d_build` with `baselineRun` writes both scenes and records the change list (`nova:baselineRun`, `nova:changes`, and the summary in ITEROP).
+- **New zone in an existing hall.** `view3d_build` with `hall` (for example `hall-b`) reads the hall's as-built record, which the operator keeps in `<twin folder>/halls/<hall>.json`. The scene is the existing equipment, with the same prim paths and values as its own scene `<hall>-as-built.usda`, plus the run as the `Extension` zone: its racks (high-density racks in navy), CDUs and its own loop above the existing one. The space check counts every unit in the shared gallery. Units whose model name says *in-row* stand at the head of the new rack row instead. Without the record, the tool refuses: the existing equipment is never invented.
 - **Comparing in the viewer:** `npm run twin:view -- <change.usda> --baseline <baseline.usda>`. The viewer offers three views:
   - *Proposed* and *Baseline* show each scene on its own;
   - *Compare* matches parts by prim path, position, size and values. Added parts are green, changed or moved parts amber, removed parts a red ghost, and unchanged parts faded.
 
-The full demo story is in [DEMO-CHANGE-SCENARIO.md](DEMO-CHANGE-SCENARIO.md).
+The demo stories are [DEMO-AI-ZONE.md](DEMO-AI-ZONE.md) (a new AI zone, the current demo) and [DEMO-CHANGE-SCENARIO.md](DEMO-CHANGE-SCENARIO.md) (a change to an approved run).
 
 ## The ITEROP step: *Update 3D view*
 

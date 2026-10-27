@@ -22,7 +22,7 @@ Call `iterop_connection` first. It reports the `engine`, which is either **SIMUL
 | `iterop_list_my_tasks` | read | Open tasks of the connector's account, with `taskId`, `runReference`, `instanceId`, `signatureTask`, `rework` and an `openInIterop` link. |
 | `iterop_get_task` | read | The fields a task expects, any data already provided, and its **`runContext`**: the run's start values (`inputs`), each earlier stage's outputs (`stages`), the engineer's `signoff` decision and comment when ITEROP shows them, and `gaps`. Each value says whether it was read from ITEROP (`iterop`) or recorded by the connector when it wrote it (`connector`). |
 | `iterop_get_instance` | read | An instance's variables. The account may get 403; then use the values the user gave. |
-| `cooling_check` | local | Independent check of **your** proposal: energy balance, lab limits, redundancy arithmetic and plausibility. It returns PASS / REVIEW / FAIL, findings, and the exact `checkTaskValues` for the "Check system limits" task, which accepts nothing else. |
+| `cooling_check` | local | Independent check of **your** proposal: energy balance, lab limits, redundancy arithmetic and plausibility. With `maxRackKw` it also checks the densest rack when densities differ. It returns PASS / REVIEW / FAIL, findings, and the exact `checkTaskValues` for the "Check system limits" task, which accepts nothing else. |
 | `iterop_start_process` | **WRITE** | Starts an instance. Values are keyed by start-form field ids. Returns `runReference`, `instanceId` and the first task. |
 | `iterop_complete_task` | **WRITE** | Completes one of the account's tasks with values keyed by its field ids. Returns the next task. Signature tasks are refused. |
 
@@ -101,7 +101,7 @@ In either mode:
 - After a rework, update the same model; the earlier reference is in `runContext.stages`.
 
 **Update 3D view.** This task records the OpenUSD 3D view of the run (`view3d_reference`, `view3d_revision`, `view3d_summary`).
-- After *Update system model*, call `view3d_build` with the run reference (and `baselineRun` for a change, see below). The connector builds the scene from the values already written to ITEROP for this run, linked to the system model, and writes the `.usda` file locally.
+- After *Update system model*, call `view3d_build` with the run reference (and `baselineRun` for a change, or `hall` for a new zone, see below). The connector builds the scene from the values already written to ITEROP for this run, linked to the system model, and writes the `.usda` file locally.
 - `view3d_build` also runs a **space check**: do the CDUs fit the CDU gallery? The heat balance can pass while the room can't hold the units. **If it is FAIL, say so prominently**: the finding, the red units in the 3D view, and that the engineer should look at it at sign-off. Never hide or soften it. In `step` mode, ask whether to record it as is (the engineer decides at sign-off) or to redesign first.
 - Write its `taskValues` to the task **unchanged**: the task accepts nothing else.
 - Tell the user how to look at it: the `view` command it returns (`npm run twin:view -- …`), then <http://127.0.0.1:8765>.
@@ -116,6 +116,16 @@ When the user describes a change to an existing, approved configuration ("Hall B
 4. **Modify the existing model; never build a second one.** Update the existing *Cooling System* block and its parts with `cameo_update_element`, `cameo_set_specification` and `cameo_set_tagged_values`; add only what is new. Model repeated units as one part with a multiplicity, so that a different unit count is a value change, not a deletion (the connector cannot delete).
 5. **3D:** call `view3d_build` with `baselineRun`. The summary written to ITEROP then lists the changes, and the `view` command opens the viewer with *Baseline / Proposed / Compare*.
 6. **After a rejection** (for example "the CDUs don't fit the gallery"), the rework loop runs as usual. Redesign from the reviewer's request, for example fewer, larger units, then update the same model again and rebuild the 3D view against the same baseline.
+
+## A new zone next to existing equipment (for example AI racks)
+
+When the user adds a zone to an existing hall ("8 AI racks of 130 kW next to Hall B"), the existing equipment stays as built:
+1. **Check the obvious idea first.** If the new racks would join the existing loop, run `cooling_check` for the whole hall with `maxRackKw` set to the densest rack. The average flow per rack can pass while the densest racks need more than the 150 L/min limit; the check then FAILs. Explain why to the user **before any write**: this dead end is part of the engineering, not an error.
+2. **Design the zone as its own loop:** typically a higher ΔT (for example 35 → 50 °C) brings the densest racks under the flow limit. Run `cooling_check` for the zone alone (zone load, zone racks, `maxRackKw`) until it passes.
+3. **Start a new run** of the cooling chain with the zone's values only. Mention the hall and the zone in the coolant rationale (for example "Hall B AI zone, next to COOL-261026-222827 as built").
+4. **System model:** keep the existing blocks unchanged. Add the zone as a **visible structural change** inside the existing *LiquidCoolingSystem*: its own blocks (for example `AIZoneLoop`, `AIRack`) and parts (`aiLoop`, `aiRack [8]`, `aiCdu [n]`) with their ports and connectors in the IBD, a requirement for the new density (for example "COOL-R6 AI zone: 130 kW per rack, ≤ 150 L/min per rack") with a *satisfy* link, all shown on the BDD and IBD (`cameo_add_to_diagram`). Then sign the receipt.
+5. **3D:** call `view3d_build` with `hall` (for example `hall-b`), never `baselineRun`. The scene shows the hall as built plus the new zone; the space check counts every unit in the shared CDU gallery. If the operator has no as-built record of that hall, the tool says so: ask the user, never invent the existing equipment.
+6. **In-row units:** a CDU model whose name says `in-row` (for example "CDU-IR-400 (in-row, 400 kW class)") stands in the new rack row, not in the gallery. When the reviewer asks to free the gallery, this is the rework: re-check, update the same zone parts in the model (unit type, count, a requirement such as "COOL-R5 CDU gallery space"), and rebuild the 3D view with the same `hall`.
 
 Task names may carry a lane prefix, such as "[Operator (NOVA acts as you)] Select coolant"; it is the same task. Run references look like `COOL-YYMMDD-HHMMSS` (`COOL-251008-141210`).
 

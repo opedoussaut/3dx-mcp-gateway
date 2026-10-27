@@ -62,7 +62,7 @@ import { USDLoader } from 'three/addons/loaders/USDLoader.js';
 
 const $ = (id) => document.getElementById(id);
 const LEGEND = {
-  normal: [['#1f2124', 'Racks'], ['#0b6b6e', 'CDU, duty'], ['#739a9e', 'CDU, standby'], ['#d93a2b', 'CDU outside the gallery'], ['#f2c14e', 'CDU gallery'], ['#1768a4', 'Secondary supply'], ['#c7332a', 'Secondary return'], ['#338c40', 'Facility water']],
+  normal: [['#1f2124', 'Racks'], ['#1a2c56', 'High-density racks'], ['#0b6b6e', 'CDU, duty'], ['#739a9e', 'CDU, standby'], ['#d93a2b', 'CDU outside the gallery'], ['#f2c14e', 'CDU gallery'], ['#1768a4', 'Secondary supply'], ['#c7332a', 'Secondary return'], ['#338c40', 'Facility water']],
   compare: [['#2fbf71', 'Added'], ['#f0a020', 'Changed or moved'], ['#e04040', 'Removed (baseline)'], ['#b8c2cb', 'Unchanged']],
 };
 const legend = (kind) => $('legend').replaceChildren(...LEGEND[kind].map(([c, t]) => {
