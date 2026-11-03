@@ -1,5 +1,7 @@
 # NOVA · Engineering workspace
 
+> **ITEROP orchestration has moved.** The Claude ⇄ ITEROP orchestration through the API Gateway, the orchestration lab, the guarded CATIA Magic connector and the OpenUSD twin continue in **[aif-twinforge](https://github.com/opedoussaut/aif-twinforge)**, an agent-assisted AI factory digital twin. This repository keeps the NOVA workspace and its read-only Business Process connector.
+
 A natural-language engineering workspace with a governed, read-only **Business Process (ITEROP)** connector, an engineering-item gateway, a semantic MCP server, and an AURA observation lab (deferred).
 
 **Claude project handover:** Read [CLAUDE.md](CLAUDE.md) for implementation ownership and [the full handover](docs/CLAUDE-HANDOVER.md) for the verified baseline, architecture, setup, limitations, and continuation backlog.

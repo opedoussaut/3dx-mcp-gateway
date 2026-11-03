@@ -13,6 +13,8 @@ Olivier remains the project owner and sets priorities. Make routine engineering 
 
 Repository: <https://github.com/opedoussaut/3dx-mcp-gateway>
 
+**Scope split (3 November 2026):** ITEROP orchestration and writes, the orchestration lab, the CATIA Magic connector and the OpenUSD twin now live in [aif-twinforge](https://github.com/opedoussaut/aif-twinforge). Do that work there. This repository keeps the NOVA workspace and its read-only Business Process connector.
+
 ## P0 — ITEROP Business Process Play FIRST
 
 **Olivier changed the execution priority again.** First deliver natural-language access to **ITEROP Business Process Play**. Dataset Governance is postponed to a subsequent integration milestone, and **AURA benchmarking remains deferred** until real app utility is demonstrated. Do not delete their existing screens or tests.
